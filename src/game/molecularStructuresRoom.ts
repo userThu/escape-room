@@ -40,7 +40,7 @@ export const molecularStructureDecals: MolecularDecal[] = [
     id: "ch4-floor-decal",
     label: "CH4",
     texturePath: "/molecules/ch4.svg",
-    position: [8.36, 1.35, 2.56],
+    position: [8.36, 1.35, 2.45],
     rotation: [0, Math.PI / 2, 0],
     size: [0.3, 0.23],
   },
@@ -48,9 +48,9 @@ export const molecularStructureDecals: MolecularDecal[] = [
     id: "nacl-furniture-decal",
     label: "NaCl lattice",
     texturePath: "/molecules/nacl-lattice.svg",
-    position: [0.14, 0.865, -1.2],
-    rotation: [-Math.PI / 2, 0, 0.02],
-    size: [0.42, 0.42],
+    position: [1.86, 0.72, 7.12],
+    rotation: [0, -Math.PI / 2, 0],
+    size: [0.34, 0.34],
   },
 ];
 

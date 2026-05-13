@@ -1,7 +1,7 @@
 import type { ColliderDefinition } from "@/src/game/collision";
 
 export type BoxProp = ColliderDefinition & {
-  material: "bench" | "cabinet" | "metal" | "hazard";
+  material: "bench" | "cabinet" | "machine" | "metal" | "hazard";
 };
 
 export type CylinderProp = {
@@ -55,7 +55,7 @@ export const labBoxProps: BoxProp[] = [
     id: "east-room-fume-hood",
     center: [7.2, 1.3, 2.45],
     size: [2.3, 2.1, 0.7],
-    material: "metal",
+    material: "machine",
   },
   {
     id: "locked-room-warning-crate",

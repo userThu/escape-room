@@ -100,6 +100,72 @@ function createCanvasTexture(
   return texture;
 }
 
+function createAtomLegendPosterTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 704;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  const atomLegend = [
+    { color: "#a66f6f", element: "O", name: "Oxygen" },
+    { color: "#4d5560", element: "C", name: "Carbon" },
+    { color: "#b7bec7", element: "H", name: "Hydrogen" },
+    { color: "#7188a6", element: "Na", name: "Sodium" },
+    { color: "#a9825e", element: "Cl", name: "Chlorine" },
+  ];
+
+  context.fillStyle = "#d7d2c5";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.strokeStyle = "#2f3437";
+  context.lineWidth = 18;
+  context.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
+
+  context.fillStyle = "#27313a";
+  context.font = "700 40px Arial";
+  context.fillText("ATOM COLOR KEY", 56, 86);
+
+  context.fillStyle = "#53606a";
+  context.font = "24px Arial";
+  context.fillText("Molecular structures lab", 58, 122);
+
+  atomLegend.forEach(({ color, element, name }, index) => {
+    const y = 190 + index * 84;
+
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(90, y, 28, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = "#c4cad1";
+    context.lineWidth = 5;
+    context.stroke();
+
+    context.fillStyle = "#27313a";
+    context.font = "700 30px Arial";
+    context.fillText(element, 140, y + 10);
+
+    context.fillStyle = "#4f5961";
+    context.font = "24px Arial";
+    context.fillText(name, 210, y + 9);
+  });
+
+  context.fillStyle = "#58646e";
+  context.font = "22px Arial";
+  context.fillText("Use this key for H2O, CO2, CH4,", 58, 634);
+  context.fillText("O2, and the NaCl lattice.", 58, 666);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  return texture;
+}
+
 export function ThreeScene() {
   const mountRef = useRef<HTMLDivElement>(null);
   const activeInterfaceRef = useRef<"notebook" | "molecularPuzzle" | null>(
@@ -244,6 +310,7 @@ export function ThreeScene() {
     const wallTexture = createCanvasTexture("#7d8587", "#656d70", "#2f383a");
     const ceilingTexture = createCanvasTexture("#5f686b", "#485154", "#252b2e");
     const doorTexture = createCanvasTexture("#343a40", "#24282d", "#7c2d12");
+    const atomLegendPosterTexture = createAtomLegendPosterTexture();
     const terminalTexture = textureLoader.load(
       "/textures/computer-terminal-texture.png",
     );
@@ -383,10 +450,21 @@ export function ThreeScene() {
       roughness: 0.22,
       metalness: 0.02,
     });
+    const posterFrameMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1f2933,
+      roughness: 0.62,
+      metalness: 0.16,
+    });
+    const atomLegendPosterMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: atomLegendPosterTexture,
+      side: THREE.DoubleSide,
+    });
     const propMaterials = {
       bench: benchMaterial,
       cabinet: cabinetMaterial,
       hazard: hazardMaterial,
+      machine: terminalBodyMaterial,
       metal: metalMaterial,
       pipe: pipeMaterial,
       tank: tankMaterial,
@@ -486,6 +564,16 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [0, height * 0.24, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
         addBoxComponent(group, blackRubberMaterial, [0, -height * 0.12, -depth / 2 - 0.04], [width * 0.08, height * 0.36, 0.04]);
         addBoxComponent(group, hazardMaterial, [0, height * 0.38, -depth / 2 - 0.05], [width * 0.45, height * 0.12, 0.03]);
+      } else if (material === "machine") {
+        addBoxComponent(group, terminalBodyMaterial, [0, 0, 0], [width, height, depth]);
+        addBoxComponent(group, terminalTrimMaterial, [0, height * 0.32, -depth / 2 - 0.03], [width * 0.78, height * 0.34, 0.05]);
+        addBoxComponent(group, terminalScreenMaterial, [-width * 0.2, height * 0.34, -depth / 2 - 0.06], [width * 0.22, height * 0.18, 0.035]);
+        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.34, -depth / 2 - 0.06], [width * 0.28, height * 0.05, 0.035]);
+        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.23, -depth / 2 - 0.06], [width * 0.28, height * 0.05, 0.035]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.18, -depth / 2 - 0.04], [width * 0.86, height * 0.04, 0.04]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.02, -depth / 2 - 0.04], [width * 0.86, height * 0.04, 0.04]);
+        addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.34, -height * 0.18, -depth * 0.18], [0.75, 0.82, 0.75]);
+        addBoxComponent(group, violetChemicalMaterial, [-width * 0.34, -height * 0.26, -depth * 0.18], [0.12, 0.08, 0.12]);
       } else if (material === "metal") {
         addBoxComponent(group, metalMaterial, [0, 0, 0], [width, height * 0.08, depth]);
         addBoxComponent(group, metalMaterial, [0, height * 0.28, 0], [width, height * 0.08, depth]);
@@ -590,6 +678,20 @@ export function ThreeScene() {
       lamp.castShadow = false;
       scene.add(lamp);
     });
+
+    const posterGroup = new THREE.Group();
+    const posterGeometry = new THREE.PlaneGeometry(0.95, 1.3);
+    const poster = new THREE.Mesh(posterGeometry, atomLegendPosterMaterial);
+
+    poster.position.set(0, 0, 0.01);
+    posterGroup.add(poster);
+    addBoxComponent(posterGroup, posterFrameMaterial, [0, 0.67, 0], [1.05, 0.04, 0.05]);
+    addBoxComponent(posterGroup, posterFrameMaterial, [0, -0.67, 0], [1.05, 0.04, 0.05]);
+    addBoxComponent(posterGroup, posterFrameMaterial, [-0.52, 0, 0], [0.04, 1.36, 0.05]);
+    addBoxComponent(posterGroup, posterFrameMaterial, [0.52, 0, 0], [0.04, 1.36, 0.05]);
+    posterGroup.position.set(-2.86, 1.75, -7.8);
+    posterGroup.rotation.y = Math.PI / 2;
+    scene.add(posterGroup);
 
     molecularStructureDecals.forEach(
       ({ position, rotation, size, texturePath }) => {
@@ -931,9 +1033,12 @@ export function ThreeScene() {
       tankMaterial.dispose();
       lampHousingMaterial.dispose();
       lampPanelMaterial.dispose();
+      posterFrameMaterial.dispose();
+      atomLegendPosterMaterial.dispose();
       cylinderGeometry.dispose();
       beakerGeometry.dispose();
       tubeGeometry.dispose();
+      posterGeometry.dispose();
       moleculeGeometries.forEach((geometry) => geometry.dispose());
       moleculeMaterials.forEach((material) => material.dispose());
       moleculeTextures.forEach((texture) => texture.dispose());
@@ -941,6 +1046,7 @@ export function ThreeScene() {
       wallTexture?.dispose();
       ceilingTexture?.dispose();
       doorTexture?.dispose();
+      atomLegendPosterTexture?.dispose();
       terminalTexture.dispose();
       renderer.dispose();
       rendererCanvasRef.current = null;
