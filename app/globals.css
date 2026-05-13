@@ -29,3 +29,25 @@ body {
 canvas {
   display: block;
 }
+
+@keyframes feedback-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  12%,
+  78% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.animate-feedback-fade {
+  animation: feedback-fade 3.2s ease forwards;
+}

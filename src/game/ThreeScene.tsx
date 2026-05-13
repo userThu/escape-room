@@ -7,6 +7,7 @@ import {
   createAabbCollider,
 } from "@/src/game/collision";
 import {
+  doorDefinitions,
   greyboxBlocks,
   greyboxColliderDefinitions,
 } from "@/src/game/greyboxLayout";
@@ -23,8 +24,10 @@ import {
 import {
   addInventoryItem,
   completePuzzle,
+  getGameState,
   recordResponse,
   selectInventoryItemByIndex,
+  unlockDoor,
 } from "@/src/state";
 import { GameHud } from "@/src/ui/GameHud";
 import { PuzzleModal } from "@/src/ui/PuzzleModal";
@@ -36,6 +39,12 @@ const sprintSpeed = 7;
 const mouseSensitivity = 0.002;
 const maxPitch = Math.PI / 2 - 0.05;
 const interactionRange = 3;
+
+type FeedbackMessage = {
+  id: number;
+  text: string;
+  tone: "success" | "failure";
+};
 
 function createCanvasTexture(
   baseColor: string,
@@ -101,6 +110,27 @@ export function ThreeScene() {
   const [isPuzzleOpen, setIsPuzzleOpen] = useState(false);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
+  );
+  const [feedbackMessages, setFeedbackMessages] = useState<FeedbackMessage[]>(
+    [],
+  );
+
+  const showFeedbackMessage = useCallback(
+    (text: string, tone: FeedbackMessage["tone"]) => {
+      const id = Date.now() + Math.random();
+
+      setFeedbackMessages((messages) => [
+        ...messages.slice(-2),
+        { id, text, tone },
+      ]);
+
+      window.setTimeout(() => {
+        setFeedbackMessages((messages) =>
+          messages.filter((message) => message.id !== id),
+        );
+      }, 3200);
+    },
+    [],
   );
 
   const releasePointerLock = useCallback(() => {
@@ -175,6 +205,8 @@ export function ThreeScene() {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111827);
+    const openedDoorIds = new Set<string>();
+    const doorMeshes = new Map<string, THREE.Mesh>();
 
     const camera = new THREE.PerspectiveCamera(
       60,
@@ -429,7 +461,7 @@ export function ThreeScene() {
       return group;
     };
 
-    greyboxBlocks.forEach(({ center, kind, size }) => {
+    greyboxBlocks.forEach(({ center, id, kind, size }) => {
       const material =
         kind === "floor"
           ? floorMaterial
@@ -445,6 +477,10 @@ export function ThreeScene() {
       block.castShadow = kind !== "floor";
       block.receiveShadow = true;
       scene.add(block);
+
+      if (kind === "door") {
+        doorMeshes.set(id, block);
+      }
     });
 
     labBoxProps.forEach((definition) => {
@@ -510,7 +546,57 @@ export function ThreeScene() {
     ].map(createAabbCollider);
     const raycaster = new THREE.Raycaster();
     raycaster.far = interactionRange;
-    const interactables: Interactable[] = [];
+    const doorInteractables: Interactable[] = doorDefinitions.flatMap((door) => {
+      const doorMesh = doorMeshes.get(door.id);
+
+      if (!doorMesh) {
+        return [];
+      }
+
+      return [
+        {
+          id: door.id,
+          object: doorMesh,
+          prompt: `Press E to open ${door.label}`,
+          interact: () => {
+            if (openedDoorIds.has(door.id)) {
+              showFeedbackMessage(`${door.label} is already open.`, "success");
+              return;
+            }
+
+            const gameState = getGameState();
+            const hasItems = (door.requirement.inventoryItemIds ?? []).every(
+              (itemId) =>
+                gameState.inventoryItems.some(({ id }) => id === itemId),
+            );
+            const hasPuzzles = (door.requirement.puzzleIds ?? []).every(
+              (puzzleId) => Boolean(gameState.completedPuzzles[puzzleId]),
+            );
+
+            if (!hasItems || !hasPuzzles) {
+              showFeedbackMessage(door.failureMessage, "failure");
+              return;
+            }
+
+            openedDoorIds.add(door.id);
+            doorMesh.visible = false;
+            doorMesh.raycast = () => {};
+            unlockDoor(door.id);
+
+            const colliderIndex = staticColliders.findIndex(
+              ({ id }) => id === door.id,
+            );
+
+            if (colliderIndex >= 0) {
+              staticColliders.splice(colliderIndex, 1);
+            }
+
+            showFeedbackMessage(door.successMessage, "success");
+          },
+        },
+      ];
+    });
+    const interactables: Interactable[] = [...doorInteractables];
     let yaw = 0;
     let pitch = 0;
     let sprinting = false;
@@ -753,7 +839,7 @@ export function ThreeScene() {
       renderer.dispose();
       rendererCanvasRef.current = null;
     };
-  }, [closeNotebook, openNotebook, openPuzzle]);
+  }, [closeNotebook, openNotebook, openPuzzle, showFeedbackMessage]);
 
   const isInterfaceOpen = isNotebookOpen || isPuzzleOpen;
 
@@ -777,6 +863,20 @@ export function ThreeScene() {
           {isSprinting ? "Sprint on" : "Sprint off"}
         </p>
         <p className="text-white/55">J opens journal</p>
+      </div>
+      <div className="pointer-events-none fixed left-6 top-32 z-20 flex max-w-sm flex-col gap-2">
+        {feedbackMessages.map((message) => (
+          <div
+            className={`animate-feedback-fade rounded border px-4 py-3 text-sm shadow-lg backdrop-blur ${
+              message.tone === "success"
+                ? "border-emerald-300/30 bg-emerald-950/70 text-emerald-100"
+                : "border-red-300/30 bg-red-950/70 text-red-100"
+            }`}
+            key={message.id}
+          >
+            {message.text}
+          </div>
+        ))}
       </div>
       <GameHud
         isNotebookOpen={isNotebookOpen}

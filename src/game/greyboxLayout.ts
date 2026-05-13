@@ -6,6 +6,19 @@ export type GreyboxBlock = ColliderDefinition & {
   kind: GreyboxBlockKind;
 };
 
+export type DoorRequirement = {
+  inventoryItemIds?: string[];
+  puzzleIds?: string[];
+};
+
+export type DoorDefinition = {
+  id: string;
+  label: string;
+  requirement: DoorRequirement;
+  successMessage: string;
+  failureMessage: string;
+};
+
 const wallHeight = 3;
 const wallY = wallHeight / 2;
 const wallThickness = 0.25;
@@ -215,3 +228,25 @@ export const greyboxBlocks: GreyboxBlock[] = [
 export const greyboxColliderDefinitions = greyboxBlocks.filter(
   ({ kind }) => kind !== "ceiling" && kind !== "floor",
 );
+
+export const doorDefinitions: DoorDefinition[] = [
+  {
+    id: "locked-room-door",
+    label: "Locked Lab Door",
+    requirement: {
+      puzzleIds: ["test-cube-puzzle"],
+    },
+    successMessage: "The locked lab door clicks open.",
+    failureMessage: "Locked: complete the chemical calibration puzzle first.",
+  },
+  {
+    id: "final-exit-door",
+    label: "Final Exit Door",
+    requirement: {
+      inventoryItemIds: ["amber-test-cube"],
+      puzzleIds: ["test-cube-puzzle"],
+    },
+    successMessage: "The final exit door releases with a heavy magnetic snap.",
+    failureMessage: "Sealed: the exit needs the Amber Cube and puzzle clearance.",
+  },
+];

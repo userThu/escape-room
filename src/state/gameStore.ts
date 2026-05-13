@@ -71,6 +71,10 @@ function getSnapshot() {
   return gameState;
 }
 
+export function getGameState() {
+  return gameState;
+}
+
 export function useGameState() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
