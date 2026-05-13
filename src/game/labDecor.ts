@@ -76,18 +76,6 @@ export const labBoxProps: BoxProp[] = [
     material: "machine",
   },
   {
-    id: "locked-room-warning-crate",
-    center: [-8.8, 0.55, -1.6],
-    size: [1.3, 1.1, 1.3],
-    material: "hazard",
-  },
-  {
-    id: "locked-room-storage-rack",
-    center: [-11.45, 1.1, 0.9],
-    size: [0.55, 2.2, 2.9],
-    material: "metal",
-  },
-  {
     id: "exit-corridor-lock-panel",
     center: [1.72, 1.2, 7.3],
     size: [0.15, 0.8, 0.55],
@@ -96,13 +84,6 @@ export const labBoxProps: BoxProp[] = [
 ];
 
 export const labCylinderProps: CylinderProp[] = [
-  {
-    id: "locked-room-pressure-tank",
-    center: [-10.6, 0.9, -2.1],
-    radius: 0.38,
-    depth: 1.8,
-    material: "tank",
-  },
   {
     id: "hub-overhead-pipe",
     center: [0, 2.55, -2.2],
@@ -139,12 +120,6 @@ export const labLamps: LabLamp[] = [
     center: [8, 2.82, 0],
     size: [2.6, 0.08, 0.32],
     intensity: 2.6,
-  },
-  {
-    id: "locked-room-dim-light",
-    center: [-8, 2.82, 0],
-    size: [2, 0.08, 0.32],
-    intensity: 1,
   },
   {
     id: "exit-corridor-fluorescent",

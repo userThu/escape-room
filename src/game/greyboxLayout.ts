@@ -44,12 +44,6 @@ export const greyboxBlocks: GreyboxBlock[] = [
     size: [8, 0.08, 6],
   },
   {
-    id: "floor-locked-room",
-    kind: "floor",
-    center: [-8, -0.04, 0],
-    size: [8, 0.08, 6],
-  },
-  {
     id: "floor-exit-corridor",
     kind: "floor",
     center: [0, -0.04, 6],
@@ -71,12 +65,6 @@ export const greyboxBlocks: GreyboxBlock[] = [
     id: "ceiling-east-puzzle-room",
     kind: "ceiling",
     center: [8, ceilingY, 0],
-    size: [8, wallThickness, 6],
-  },
-  {
-    id: "ceiling-locked-room",
-    kind: "ceiling",
-    center: [-8, ceilingY, 0],
     size: [8, wallThickness, 6],
   },
   {
@@ -110,22 +98,10 @@ export const greyboxBlocks: GreyboxBlock[] = [
     size: [wallThickness, wallHeight, 2.5],
   },
   {
-    id: "hub-west-wall-top",
+    id: "hub-west-wall",
     kind: "wall",
-    center: [-4, wallY, -2.55],
-    size: [wallThickness, wallHeight, 2.9],
-  },
-  {
-    id: "hub-west-wall-bottom",
-    kind: "wall",
-    center: [-4, wallY, 2.55],
-    size: [wallThickness, wallHeight, 2.9],
-  },
-  {
-    id: "locked-room-door",
-    kind: "door",
     center: [-4, wallY, 0],
-    size: [wallThickness, wallHeight, 2.2],
+    size: [wallThickness, wallHeight, 8],
   },
   {
     id: "hub-south-wall-left",
@@ -176,24 +152,6 @@ export const greyboxBlocks: GreyboxBlock[] = [
     size: [wallThickness, wallHeight, 6],
   },
   {
-    id: "locked-room-north-wall",
-    kind: "wall",
-    center: [-8, wallY, -3],
-    size: [8, wallHeight, wallThickness],
-  },
-  {
-    id: "locked-room-south-wall",
-    kind: "wall",
-    center: [-8, wallY, 3],
-    size: [8, wallHeight, wallThickness],
-  },
-  {
-    id: "locked-room-west-wall",
-    kind: "wall",
-    center: [-12, wallY, 0],
-    size: [wallThickness, wallHeight, 6],
-  },
-  {
     id: "exit-corridor-west-wall",
     kind: "wall",
     center: [-2, wallY, 6],
@@ -218,7 +176,7 @@ export const greyboxBlocks: GreyboxBlock[] = [
     size: [1, wallHeight, wallThickness],
   },
   {
-    id: "final-exit-door",
+    id: "final-door",
     kind: "door",
     center: [0, wallY, 8],
     size: [2, wallHeight, wallThickness],
@@ -229,24 +187,21 @@ export const greyboxColliderDefinitions = greyboxBlocks.filter(
   ({ kind }) => kind !== "ceiling" && kind !== "floor",
 );
 
+/**
+ * Door definitions for the two-room, three-stage escape route.
+ *
+ * Stage gate → final-door : requires both lab puzzles + final_access item
+ */
 export const doorDefinitions: DoorDefinition[] = [
   {
-    id: "locked-room-door",
-    label: "Locked Lab Door",
+    id: "final-door",
+    label: "Final Door",
     requirement: {
-      puzzleIds: ["molecular-structures"],
+      inventoryItemIds: ["final_access"],
+      puzzleIds: ["molecular-structures", "evidence-lab"],
     },
-    successMessage: "The locked lab door clicks open.",
-    failureMessage: "Locked: molecular structure clearance is required.",
-  },
-  {
-    id: "final-exit-door",
-    label: "Final Exit Door",
-    requirement: {
-      inventoryItemIds: ["molecular-access-card"],
-      puzzleIds: ["molecular-structures"],
-    },
-    successMessage: "The final exit door releases with a heavy magnetic snap.",
-    failureMessage: "Sealed: the exit needs molecular clearance and its access card.",
+    successMessage: "The final door releases with a heavy magnetic snap.",
+    failureMessage:
+      "Sealed: complete both lab stages and present final access credentials.",
   },
 ];

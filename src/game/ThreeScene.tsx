@@ -13,6 +13,7 @@ import { buildGameWorld } from "@/src/game/rendering/worldBuilder";
 import { createMoleculePlaqueTexture } from "@/src/game/rendering/textures";
 import {
   addInventoryItem,
+  addLabNotebookEntry,
   completePuzzle,
   getGameState,
   type InventoryItem,
@@ -30,15 +31,20 @@ const sprintSpeed = 7;
 const mouseSensitivity = 0.002;
 const maxPitch = Math.PI / 2 - 0.05;
 const interactionRange = 3;
+/**
+ * Inventory item IDs that the evidence-lab reaction station accepts as inputs.
+ * Cartridge/token IDs match the new two-room item catalogue.
+ */
 const reactionIngredientIds = new Set([
-  "ice",
-  "candle",
-  "vinegar",
-  "baking soda",
-  "baking-soda",
-  "sugar",
-  "iron",
-  "water",
+  "water_cartridge",
+  "vinegar_cartridge",
+  "baking_soda_cartridge",
+  "sugar_cartridge",
+  "sand_cartridge",
+  "bubble_token",
+  "spiral_token",
+  "sieve_token",
+  "particle_lens",
 ]);
 
 type FeedbackMessage = {
@@ -144,16 +150,28 @@ export function ThreeScene() {
     completePuzzle("molecular-structures");
 
     if (!wasAlreadyCompleted) {
+      // Stage 1 reward: particle_lens unlocks the evidence-lab analysis station.
       addInventoryItem({
-        id: "molecular-access-card",
-        name: "Molecular Access Card",
-        description: "A terminal-issued clearance card for molecule verification.",
+        id: "particle_lens",
+        name: "Particle Lens",
+        description:
+          "A precision optical insert issued by the molecular board. Required to activate the evidence-lab station.",
       });
+      // Stage 1 also seeds the first cartridge so the player can begin lab work.
       addInventoryItem({
-        id: "reaction-slider",
-        name: "Reaction Slider",
-        description: "A notched insert for the chemical reaction machine.",
+        id: "water_cartridge",
+        name: "Water Cartridge",
+        description: "A sealed cartridge of distilled water for the evidence-lab analysis station.",
       });
+      addLabNotebookEntry(
+        "Particle Lens — Field Notes",
+        "The molecular board issued a Particle Lens alongside the water cartridge. " +
+          "When held up to the viewer port on the final door, the lens refracts the " +
+          "internal beam and projects a before/after particle diagram onto the frosted " +
+          "panel — showing the substance's particle arrangement before separation and " +
+          "its purified state after. Match both diagrams to the reference chart to " +
+          "confirm the correct separation sequence and release the door lock.",
+      );
     }
     recordResponse(
       "molecular-structures",
@@ -430,9 +448,9 @@ export function ThreeScene() {
         },
       },
       {
-        id: "reaction-machine-chamber",
+        id: "evidence-lab-chamber",
         object: reactionMachineChamber,
-        prompt: "Press E to place selected item in chamber",
+        prompt: "Press E to load selected cartridge or token",
         interact: () => {
           const gameState = getGameState();
           const selectedItem = gameState.inventoryItems.find(
@@ -441,7 +459,7 @@ export function ThreeScene() {
 
           if (!selectedItem) {
             showFeedbackMessage(
-              "Select an inventory item before using the reaction chamber.",
+              "Select a cartridge or token before loading the evidence-lab station.",
               "failure",
             );
             return;
@@ -449,7 +467,7 @@ export function ThreeScene() {
 
           if (!reactionIngredientIds.has(selectedItem.id)) {
             showFeedbackMessage(
-              "The chamber rejects that sample. Try a basic reaction material.",
+              "The station rejects that item. Load a recognised cartridge or token.",
               "failure",
             );
             return;
@@ -457,28 +475,28 @@ export function ThreeScene() {
 
           removeInventoryItem(selectedItem.id);
           recordResponse(
-            "reaction-machine-sample",
-            `Placed ${selectedItem.id} in the chemical reaction chamber.`,
+            "evidence-lab",
+            `Loaded ${selectedItem.id} into the evidence-lab analysis station.`,
           );
           showFeedbackMessage(
-            `${selectedItem.name} drops into the reaction chamber.`,
+            `${selectedItem.name} loads into the evidence-lab station.`,
             "success",
           );
         },
       },
       {
-        id: "reaction-machine-slider-slot",
+        id: "evidence-lab-lens-slot",
         object: reactionMachineSliderSlot,
-        prompt: "Press E to insert reaction slider",
+        prompt: "Press E to insert Particle Lens",
         interact: () => {
           const gameState = getGameState();
           const selectedItem = gameState.inventoryItems.find(
             ({ id }) => id === gameState.selectedInventoryItemId,
           );
 
-          if (selectedItem?.id !== "reaction-slider") {
+          if (selectedItem?.id !== "particle_lens") {
             showFeedbackMessage(
-              "This side panel needs the Reaction Slider.",
+              "This station slot requires the Particle Lens.",
               "failure",
             );
             return;
@@ -486,11 +504,11 @@ export function ThreeScene() {
 
           removeInventoryItem(selectedItem.id);
           recordResponse(
-            "reaction-machine-slider",
-            "Inserted the Molecular Structures slider into the reaction machine.",
+            "evidence-lab",
+            "Inserted the Particle Lens into the evidence-lab analysis station.",
           );
           showFeedbackMessage(
-            "The slider locks into the side panel with a mechanical click.",
+            "The Particle Lens locks into the station with a precise click.",
             "success",
           );
         },
@@ -513,16 +531,16 @@ export function ThreeScene() {
         },
       })),
       {
-        id: "east-room-water-beaker",
+        id: "evidence-lab-water-cartridge",
         object: waterBeaker,
-        prompt: "Press E to collect water",
+        prompt: "Press E to collect Water Cartridge",
         interact: () => {
           const hasWater = getGameState().inventoryItems.some(
-            ({ id }) => id === "water",
+            ({ id }) => id === "water_cartridge",
           );
 
           if (hasWater) {
-            showFeedbackMessage("You already collected the water sample.", "success");
+            showFeedbackMessage("You already collected the water cartridge.", "success");
             return;
           }
 
@@ -541,12 +559,12 @@ export function ThreeScene() {
           }
           waterBeaker.raycast = () => {};
           addInventoryItem({
-            id: "water",
-            name: "Water",
-            description: "A blue water sample from the open lab cabinet.",
+            id: "water_cartridge",
+            name: "Water Cartridge",
+            description: "A sealed cartridge of distilled water for the evidence-lab analysis station.",
           });
-          recordResponse("east-room-cabinet", "Collected the water sample.");
-          showFeedbackMessage("Collected water sample.", "success");
+          recordResponse("evidence-lab", "Collected the water cartridge.");
+          showFeedbackMessage("Collected Water Cartridge.", "success");
         },
       },
     ];

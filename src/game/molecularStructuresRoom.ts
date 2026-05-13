@@ -24,6 +24,7 @@ export type MolecularSlotDefinition = {
 export const molecularStructuresRoom = {
   id: "molecular-structures-scenic-layer",
   internalName: "Molecular Structures",
+  /** Areas reachable inside Room 1. The exit corridor (final-door stage) is Room 2. */
   accessibleAreaIds: ["hub", "north-puzzle-room", "east-puzzle-room"],
 };
 
@@ -79,14 +80,5 @@ export const molecularPlaques: MolecularPlaqueDefinition[] = [
     kind: "H2O-wrong-color",
     position: [3.78, 2.16, 2.23],
     rotation: [0, -Math.PI/2, 0],
-  },
-  {
-    id: "molecular-plaque-co2-bent",
-    name: "Molecule Plaque F",
-    description: "A misleading plaque with a bent structure.",
-    formula: "distractor",
-    kind: "CO2-bent",
-    position: [-3.64, 2.82, -2.25],
-    rotation: [-Math.PI / 4, Math.PI / 4, Math.PI / 5],
-  },
+  }
 ];
