@@ -87,9 +87,9 @@ export const labCylinderProps: CylinderProp[] = [
   },
   {
     id: "hub-overhead-pipe",
-    center: [0, 2.55, -1.2],
+    center: [0, 2.55, -2.2],
     radius: 0.08,
-    depth: 7.2,
+    depth: 8.2,
     material: "pipe",
     rotation: [0, 0, Math.PI / 2],
   },

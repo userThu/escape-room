@@ -31,7 +31,6 @@ import {
   selectInventoryItemByIndex,
   unlockDoor,
 } from "@/src/state";
-import { GameHud } from "@/src/ui/GameHud";
 import { MolecularPuzzleTerminal } from "@/src/ui/MolecularPuzzleTerminal";
 
 const playerHeight = 1.7;
@@ -47,6 +46,11 @@ type FeedbackMessage = {
   text: string;
   tone: "success" | "failure";
 };
+
+// "menu" = showing Play/Instructions buttons
+// "instructions" = showing instructions view
+// "gone" = start screen dismissed, game running
+type StartScreen = "menu" | "instructions" | "gone";
 
 function createCanvasTexture(
   baseColor: string,
@@ -171,12 +175,12 @@ export function ThreeScene() {
   const activeInterfaceRef = useRef<"notebook" | "molecularPuzzle" | null>(
     null,
   );
-  const isPlayerPausedRef = useRef(false);
+  const isPlayerPausedRef = useRef(true); // start paused until Play is clicked
   const rendererCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const targetedInteractableRef = useRef<Interactable | null>(null);
+  const [startScreen, setStartScreen] = useState<StartScreen>("menu");
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [isSprinting, setIsSprinting] = useState(false);
-  const [isNotebookOpen, setIsNotebookOpen] = useState(false);
   const [isMolecularPuzzleOpen, setIsMolecularPuzzleOpen] = useState(false);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
@@ -232,16 +236,26 @@ export function ThreeScene() {
     requestPointerLockAfterInterface();
   }, [requestPointerLockAfterInterface]);
 
-  const openNotebook = useCallback(() => {
-    activeInterfaceRef.current = "notebook";
-    pausePlayerForInterface();
-    setIsNotebookOpen(true);
-  }, [pausePlayerForInterface]);
+  // ── Start screen handlers ────────────────────────────────────────────────
+  const handlePlay = useCallback(() => {
+    setStartScreen("gone");
+    isPlayerPausedRef.current = false;
+    // Request pointer lock on the canvas
+    if (rendererCanvasRef.current) {
+      void rendererCanvasRef.current.requestPointerLock().catch(() => {
+        setIsPointerLocked(false);
+      });
+    }
+  }, []);
 
-  const closeNotebook = useCallback(() => {
-    setIsNotebookOpen(false);
-    resumePlayerFromInterface();
-  }, [resumePlayerFromInterface]);
+  const handleShowInstructions = useCallback(() => {
+    setStartScreen("instructions");
+  }, []);
+
+  const handleBackToMenu = useCallback(() => {
+    setStartScreen("menu");
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
 
   const openMolecularPuzzle = useCallback(() => {
     activeInterfaceRef.current = "molecularPuzzle";
@@ -548,7 +562,7 @@ export function ThreeScene() {
       const depth = size[2];
 
       if (material === "bench") {
-        addBoxComponent(group, benchMaterial, [0, height / 2 - 0.08, 0], [width, 0.16, depth]);
+        addBoxComponent(group, benchMaterial, [0, height / 2 - 0.07, 0], [width, 0.16, depth]);
         addBoxComponent(group, metalMaterial, [-width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
         addBoxComponent(group, metalMaterial, [width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
         addBoxComponent(group, metalMaterial, [-width * 0.4, 0, depth * 0.38], [0.12, height, 0.12]);
@@ -558,12 +572,6 @@ export function ThreeScene() {
         addBoxComponent(group, amberChemicalMaterial, [-width * 0.22, height / 2 + 0.04, 0], [0.18, 0.1, 0.18]);
         addBoxComponent(group, paperMaterial, [width * 0.22, height / 2 + 0.02, depth * 0.08], [0.5, 0.02, 0.34]);
         addVialRack(group, [width * 0.08, height / 2 + 0.04, -depth * 0.22]);
-      } else if (material === "cabinet") {
-        addBoxComponent(group, cabinetMaterial, [0, 0, 0], [width, height, depth]);
-        addBoxComponent(group, metalMaterial, [0, 0, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
-        addBoxComponent(group, metalMaterial, [0, height * 0.24, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
-        addBoxComponent(group, blackRubberMaterial, [0, -height * 0.12, -depth / 2 - 0.04], [width * 0.08, height * 0.36, 0.04]);
-        addBoxComponent(group, hazardMaterial, [0, height * 0.38, -depth / 2 - 0.05], [width * 0.45, height * 0.12, 0.03]);
       } else if (material === "machine") {
         addBoxComponent(group, terminalBodyMaterial, [0, 0, 0], [width, height, depth]);
         addBoxComponent(group, terminalTrimMaterial, [0, height * 0.32, -depth / 2 - 0.03], [width * 0.78, height * 0.34, 0.05]);
@@ -582,7 +590,7 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, -depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [-width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
-        addVialRack(group, [0, height * 0.24, 0]);
+        addVialRack(group, [0, height * 0.24+.2, 0]);
       } else {
         addBoxComponent(group, hazardMaterial, [0, 0, 0], [width, height, depth]);
         addBoxComponent(group, blackRubberMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
@@ -841,20 +849,8 @@ export function ThreeScene() {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "KeyJ" && !event.repeat) {
-        event.preventDefault();
-
-        if (activeInterfaceRef.current === "notebook") {
-          closeNotebook();
-        } else if (isPlayerPausedRef.current) {
-          return;
-        } else {
-          pressedKeys.clear();
-          sprinting = false;
-          setIsSprinting(false);
-          openNotebook();
-        }
-
+      // Block all keyboard input while start screen is showing
+      if (isPlayerPausedRef.current && activeInterfaceRef.current === null) {
         return;
       }
 
@@ -1051,49 +1047,158 @@ export function ThreeScene() {
       renderer.dispose();
       rendererCanvasRef.current = null;
     };
-  }, [closeNotebook, openMolecularPuzzle, openNotebook, showFeedbackMessage]);
+  }, [openMolecularPuzzle, showFeedbackMessage]);
 
-  const isInterfaceOpen = isNotebookOpen || isMolecularPuzzleOpen;
+  const isInterfaceOpen = isMolecularPuzzleOpen;
 
   return (
     <div ref={mountRef} className="fixed inset-0 cursor-crosshair">
-      {isInterfaceOpen ? (
-        <div className="pointer-events-none fixed inset-0 z-10 bg-black/55" />
-      ) : null}
-      <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2">
-        <div className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-white/70" />
-        <div className="absolute left-0 top-1/2 h-px w-4 -translate-y-1/2 bg-white/70" />
-      </div>
-      {interactionPrompt ? (
-        <div className="pointer-events-none fixed left-1/2 top-[calc(50%+2rem)] z-10 -translate-x-1/2 rounded border border-white/15 bg-black/45 px-3 py-2 text-sm font-medium text-white/90 backdrop-blur">
-          {interactionPrompt}
-        </div>
-      ) : null}
-      <div className="pointer-events-none fixed left-6 top-6 z-10 rounded border border-white/15 bg-black/35 px-4 py-3 text-sm text-white/85 backdrop-blur">
-        <p>{isPointerLocked ? "Pointer locked" : "Click to lock pointer"}</p>
-        <p className="text-white/55">
-          {isSprinting ? "Sprint on" : "Sprint off"}
-        </p>
-        <p className="text-white/55">J opens journal</p>
-      </div>
-      <div className="pointer-events-none fixed left-6 top-32 z-20 flex max-w-sm flex-col gap-2">
-        {feedbackMessages.map((message) => (
+      {/* ── Start Screen Panel ───────────────────────────────────────────── */}
+      {startScreen !== "gone" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div
-            className={`animate-feedback-fade rounded border px-4 py-3 text-sm shadow-lg backdrop-blur ${
-              message.tone === "success"
-                ? "border-emerald-300/30 bg-emerald-950/70 text-emerald-100"
-                : "border-red-300/30 bg-red-950/70 text-red-100"
-            }`}
-            key={message.id}
+            className="relative w-full max-w-md rounded-lg border border-slate-600/60 bg-slate-900/95 px-10 py-10 shadow-2xl"
+            style={{ boxShadow: "0 0 60px rgba(14,165,233,0.08), 0 25px 50px rgba(0,0,0,0.7)" }}
           >
-            {message.text}
+            {/* Thin cyan accent line at top */}
+            <div className="absolute left-0 top-0 h-px w-full rounded-t-lg bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent" />
+
+            {startScreen === "menu" && (
+              <>
+                {/* Title */}
+                <div className="mb-1 text-center">
+                  <p className="mb-3 font-mono text-xs uppercase tracking-[0.3em] text-cyan-500/70">
+                    Laboratory Escape
+                  </p>
+                  <h1
+                    className="text-4xl font-bold tracking-tight text-slate-100"
+                    style={{ fontFamily: "'Georgia', 'Times New Roman', serif", letterSpacing: "-0.02em" }}
+                  >
+                    Chemistry Escape
+                  </h1>
+                  <div className="mx-auto mt-4 h-px w-16 bg-gradient-to-r from-transparent via-slate-500 to-transparent" />
+                </div>
+
+                {/* Buttons */}
+                <div className="mt-10 flex flex-col gap-3">
+                  <button
+                    onClick={handlePlay}
+                    className="group relative w-full overflow-hidden rounded border border-cyan-500/40 bg-cyan-950/50 px-6 py-3.5 font-mono text-sm font-semibold uppercase tracking-widest text-cyan-300 transition-all duration-200 hover:border-cyan-400/70 hover:bg-cyan-900/60 hover:text-cyan-100 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                  >
+                    <span className="relative z-10">▶ Play</span>
+                  </button>
+                  <button
+                    onClick={handleShowInstructions}
+                    className="w-full rounded border border-slate-600/50 bg-slate-800/50 px-6 py-3.5 font-mono text-sm font-semibold uppercase tracking-widest text-slate-400 transition-all duration-200 hover:border-slate-500/70 hover:bg-slate-700/50 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500/50"
+                  >
+                    Instructions
+                  </button>
+                </div>
+
+                {/* Footer hint */}
+                <p className="mt-8 text-center font-mono text-xs text-slate-600">
+                  Click Play, then click the screen to lock your cursor
+                </p>
+              </>
+            )}
+
+            {startScreen === "instructions" && (
+              <>
+                {/* Back button */}
+                <button
+                  onClick={handleBackToMenu}
+                  className="mb-6 flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-300 focus:outline-none"
+                >
+                  <span>←</span>
+                  <span>Back</span>
+                </button>
+
+                {/* Story */}
+                <p className="text-sm leading-relaxed text-slate-300">
+                  You have found yourself lost in an abandoned science laboratory
+                  whose doors are all locked, requiring strange mechanisms to open.
+                  Fortunately, as an expert chemist, these symbols and puzzles seem
+                  familiar and may even be solvable. Use your knowledge to escape
+                  from this predicament!
+                </p>
+
+                {/* Divider */}
+                <div className="my-7 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-700/80" />
+                  <span className="font-mono text-xs uppercase tracking-widest text-slate-500">
+                    How to Play
+                  </span>
+                  <div className="h-px flex-1 bg-slate-700/80" />
+                </div>
+
+                {/* Keybinds */}
+                <div className="flex flex-col gap-3">
+                  {[
+                    { key: "WASD", desc: "Move around the world" },
+                    { key: "Shift", desc: "Sprint to move faster" },
+                    { key: "E", desc: "Interact with objects" },
+                    { key: "J", desc: "Open your journal" },
+                  ].map(({ key, desc }) => (
+                    <div key={key} className="flex items-center gap-4">
+                      <kbd
+                        className="min-w-[3rem] rounded border border-slate-600 bg-slate-800 px-2.5 py-1 text-center font-mono text-xs font-bold text-slate-200 shadow-sm"
+                        style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.5)" }}
+                      >
+                        {key}
+                      </kbd>
+                      <span className="text-sm text-slate-400">{desc}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Play from instructions */}
+                <button
+                  onClick={handlePlay}
+                  className="mt-8 w-full rounded border border-cyan-500/40 bg-cyan-950/50 px-6 py-3 font-mono text-sm font-semibold uppercase tracking-widest text-cyan-300 transition-all duration-200 hover:border-cyan-400/70 hover:bg-cyan-900/60 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                >
+                  ▶ Play
+                </button>
+              </>
+            )}
+
+            {/* Thin cyan accent line at bottom */}
+            <div className="absolute bottom-0 left-0 h-px w-full rounded-b-lg bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
           </div>
-        ))}
-      </div>
-      <GameHud
-        isNotebookOpen={isNotebookOpen}
-        onCloseNotebook={closeNotebook}
-      />
+        </div>
+      )}
+
+      {/* ── In-game overlay elements (only shown once game started) ─────── */}
+      {startScreen === "gone" && (
+        <>
+          {isInterfaceOpen ? (
+            <div className="pointer-events-none fixed inset-0 z-10 bg-black/55" />
+          ) : null}
+          <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-white/70" />
+            <div className="absolute left-0 top-1/2 h-px w-4 -translate-y-1/2 bg-white/70" />
+          </div>
+          {interactionPrompt ? (
+            <div className="pointer-events-none fixed left-1/2 top-[calc(50%+2rem)] z-10 -translate-x-1/2 rounded border border-white/15 bg-black/45 px-3 py-2 text-sm font-medium text-white/90 backdrop-blur">
+              {interactionPrompt}
+            </div>
+          ) : null}
+          <div className="pointer-events-none fixed left-6 top-32 z-20 flex max-w-sm flex-col gap-2">
+            {feedbackMessages.map((message) => (
+              <div
+                className={`animate-feedback-fade rounded border px-4 py-3 text-sm shadow-lg backdrop-blur ${
+                  message.tone === "success"
+                    ? "border-emerald-300/30 bg-emerald-950/70 text-emerald-100"
+                    : "border-red-300/30 bg-red-950/70 text-red-100"
+                }`}
+                key={message.id}
+              >
+                {message.text}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <MolecularPuzzleTerminal
         isOpen={isMolecularPuzzleOpen}
         onClose={closeMolecularPuzzle}
