@@ -5,6 +5,7 @@ import * as THREE from "three";
 import {
   collidesWithStaticGeometry,
   createAabbCollider,
+  type ColliderDefinition,
 } from "@/src/game/collision";
 import {
   doorDefinitions,
@@ -31,7 +32,7 @@ import {
   unlockDoor,
 } from "@/src/state";
 import { GameHud } from "@/src/ui/GameHud";
-import { PuzzleModal } from "@/src/ui/PuzzleModal";
+import { MolecularPuzzleTerminal } from "@/src/ui/MolecularPuzzleTerminal";
 
 const playerHeight = 1.7;
 const playerRadius = 0.35;
@@ -101,14 +102,16 @@ function createCanvasTexture(
 
 export function ThreeScene() {
   const mountRef = useRef<HTMLDivElement>(null);
-  const activeInterfaceRef = useRef<"notebook" | "puzzle" | null>(null);
+  const activeInterfaceRef = useRef<"notebook" | "molecularPuzzle" | null>(
+    null,
+  );
   const isPlayerPausedRef = useRef(false);
   const rendererCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const targetedInteractableRef = useRef<Interactable | null>(null);
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [isSprinting, setIsSprinting] = useState(false);
   const [isNotebookOpen, setIsNotebookOpen] = useState(false);
-  const [isPuzzleOpen, setIsPuzzleOpen] = useState(false);
+  const [isMolecularPuzzleOpen, setIsMolecularPuzzleOpen] = useState(false);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
   );
@@ -174,28 +177,34 @@ export function ThreeScene() {
     resumePlayerFromInterface();
   }, [resumePlayerFromInterface]);
 
-  const openPuzzle = useCallback(() => {
-    activeInterfaceRef.current = "puzzle";
+  const openMolecularPuzzle = useCallback(() => {
+    activeInterfaceRef.current = "molecularPuzzle";
     pausePlayerForInterface();
-    setIsPuzzleOpen(true);
+    setIsMolecularPuzzleOpen(true);
   }, [pausePlayerForInterface]);
 
-  const closePuzzle = useCallback(() => {
-    setIsPuzzleOpen(false);
+  const closeMolecularPuzzle = useCallback(() => {
+    setIsMolecularPuzzleOpen(false);
     resumePlayerFromInterface();
   }, [resumePlayerFromInterface]);
 
-  const completeTestPuzzle = useCallback(() => {
-    console.log("Completed the test puzzle.");
-    completePuzzle("test-cube-puzzle");
+  const completeMolecularPuzzle = useCallback(() => {
+    completePuzzle("molecular-structures");
     addInventoryItem({
-      id: "amber-test-cube",
-      name: "Amber Cube",
-      description: "A warm, geometric sample from the interaction test.",
+      id: "molecular-access-card",
+      name: "Molecular Access Card",
+      description: "A terminal-issued clearance card for molecule verification.",
     });
-    recordResponse("test-cube-puzzle", "Player completed the test puzzle.");
-    closePuzzle();
-  }, [closePuzzle]);
+    recordResponse(
+      "molecular-structures",
+      "Player correctly matched the observed molecular structures.",
+    );
+    showFeedbackMessage(
+      "Molecular terminal accepted the formulas. Clearance granted.",
+      "success",
+    );
+    closeMolecularPuzzle();
+  }, [closeMolecularPuzzle, showFeedbackMessage]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -230,10 +239,18 @@ export function ThreeScene() {
     const moleculeTextures: THREE.Texture[] = [];
     const moleculeMaterials: THREE.Material[] = [];
     const moleculeGeometries: THREE.BufferGeometry[] = [];
+    const textureLoader = new THREE.TextureLoader();
     const floorTexture = createCanvasTexture("#343c47", "#242b34", "#6b5e48");
     const wallTexture = createCanvasTexture("#7d8587", "#656d70", "#2f383a");
     const ceilingTexture = createCanvasTexture("#5f686b", "#485154", "#252b2e");
     const doorTexture = createCanvasTexture("#343a40", "#24282d", "#7c2d12");
+    const terminalTexture = textureLoader.load(
+      "/textures/computer-terminal-texture.png",
+    );
+
+    terminalTexture.colorSpace = THREE.SRGBColorSpace;
+    terminalTexture.wrapS = THREE.RepeatWrapping;
+    terminalTexture.wrapT = THREE.RepeatWrapping;
 
     if (floorTexture) {
       floorTexture.repeat.set(3, 3);
@@ -295,6 +312,24 @@ export function ThreeScene() {
       roughness: 0.52,
       metalness: 0.08,
     });
+    const terminalBodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x26313d,
+      map: terminalTexture,
+      roughness: 0.5,
+      metalness: 0.42,
+    });
+    const terminalTrimMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111827,
+      roughness: 0.55,
+      metalness: 0.35,
+    });
+    const terminalScreenMaterial = new THREE.MeshStandardMaterial({
+      color: 0x67e8f9,
+      emissive: 0x0891b2,
+      emissiveIntensity: 1.25,
+      roughness: 0.18,
+      metalness: 0.04,
+    });
     const glassMaterial = new THREE.MeshStandardMaterial({
       color: 0x8ecae6,
       opacity: 0.42,
@@ -351,7 +386,6 @@ export function ThreeScene() {
     const propMaterials = {
       bench: benchMaterial,
       cabinet: cabinetMaterial,
-      glass: glassMaterial,
       hazard: hazardMaterial,
       metal: metalMaterial,
       pipe: pipeMaterial,
@@ -359,7 +393,6 @@ export function ThreeScene() {
     };
     const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 16);
     const beakerGeometry = new THREE.CylinderGeometry(0.18, 0.16, 0.42, 16, 1, true);
-    const flaskGeometry = new THREE.SphereGeometry(0.2, 16, 8);
     const tubeGeometry = new THREE.CylinderGeometry(0.045, 0.045, 0.42, 12);
 
     const addBoxComponent = (
@@ -407,7 +440,7 @@ export function ThreeScene() {
 
       [-0.16, 0, 0.16].forEach((offset, index) => {
         const tubeX = position[0] + offset;
-        const tubeY = position[1] + 0.18;
+        const tubeY = position[1] + 0.11;
         const liquidMaterial =
           index % 2 === 0 ? amberChemicalMaterial : violetChemicalMaterial;
 
@@ -416,13 +449,13 @@ export function ThreeScene() {
           tubeGeometry,
           glassMaterial,
           [tubeX, tubeY, position[2]],
-          [0.9, 0.8, 0.9],
+          [0.9, 0.66, 0.9],
         );
         addBoxComponent(
           group,
           liquidMaterial,
-          [tubeX, tubeY - 0.08, position[2]],
-          [0.045, 0.12, 0.045],
+          [tubeX, tubeY - 0.06, position[2]],
+          [0.042, 0.08, 0.042],
         );
       });
     };
@@ -461,15 +494,7 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, -depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [-width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
-        addVialRack(group, [0, height * 0.36, 0]);
-      } else if (material === "glass") {
-        addBoxComponent(group, metalMaterial, [0, -height * 0.48, 0], [width, height * 0.06, depth]);
-        addBoxComponent(group, metalMaterial, [0, height * 0.48, 0], [width, height * 0.06, depth]);
-        addBoxComponent(group, glassMaterial, [0, 0, -depth * 0.47], [width, height, 0.04]);
-        addBoxComponent(group, glassMaterial, [-width * 0.48, 0, 0], [0.04, height, depth]);
-        addBoxComponent(group, glassMaterial, [width * 0.48, 0, 0], [0.04, height, depth]);
-        addCylinderComponent(group, flaskGeometry, glassMaterial, [-width * 0.18, -height * 0.08, 0], [1, 1.2, 1]);
-        addCylinderComponent(group, tubeGeometry, glassMaterial, [width * 0.18, 0, 0], [1, 1, 1]);
+        addVialRack(group, [0, height * 0.24, 0]);
       } else {
         addBoxComponent(group, hazardMaterial, [0, 0, 0], [width, height, depth]);
         addBoxComponent(group, blackRubberMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
@@ -509,6 +534,28 @@ export function ThreeScene() {
       scene.add(prop);
     });
 
+    const terminalGroup = new THREE.Group();
+    const addTerminalBox = (
+      material: THREE.Material,
+      position: [number, number, number],
+      scale: [number, number, number],
+    ) => addBoxComponent(terminalGroup, material, position, scale);
+
+    addTerminalBox(terminalTrimMaterial, [0.14, 0.18, 0], [0.42, 0.36, 0.76]);
+    addTerminalBox(terminalBodyMaterial, [0, 0.58, 0], [0.6, 0.72, 1.1]);
+    addTerminalBox(terminalTrimMaterial, [-0.33, 0.84, 0], [0.08, 0.58, 0.94]);
+    const terminalScreen = addTerminalBox(
+      terminalScreenMaterial,
+      [-0.38, 0.9, 0],
+      [0.04, 0.42, 0.72],
+    );
+    addTerminalBox(terminalTrimMaterial, [-0.46, 0.46, 0], [0.38, 0.08, 0.88]);
+    addTerminalBox(terminalBodyMaterial, [-0.58, 0.5, -0.18], [0.06, 0.06, 0.08]);
+    addTerminalBox(terminalBodyMaterial, [-0.58, 0.5, 0], [0.06, 0.06, 0.08]);
+    addTerminalBox(terminalBodyMaterial, [-0.58, 0.5, 0.18], [0.06, 0.06, 0.08]);
+    terminalGroup.position.set(2.58, 0.65, -7.8);
+    scene.add(terminalGroup);
+
     labCylinderProps.forEach(({ center, depth, material, radius, rotation }) => {
       const prop = new THREE.Mesh(cylinderGeometry, propMaterials[material]);
 
@@ -546,7 +593,7 @@ export function ThreeScene() {
 
     molecularStructureDecals.forEach(
       ({ position, rotation, size, texturePath }) => {
-        const texture = new THREE.TextureLoader().load(texturePath);
+        const texture = textureLoader.load(texturePath);
         const material = new THREE.MeshBasicMaterial({
           color: 0xffffff,
           map: texture,
@@ -585,6 +632,11 @@ export function ThreeScene() {
     const staticColliders = [
       ...greyboxColliderDefinitions,
       ...labPropColliderDefinitions,
+      {
+        id: "molecular-structures-terminal",
+        center: [2.5, 1.33, -7.8],
+        size: [0.95, 1.36, 1.35],
+      } satisfies ColliderDefinition,
     ].map(createAabbCollider);
     const raycaster = new THREE.Raycaster();
     raycaster.far = interactionRange;
@@ -638,7 +690,15 @@ export function ThreeScene() {
         },
       ];
     });
-    const interactables: Interactable[] = [...doorInteractables];
+    const interactables: Interactable[] = [
+      ...doorInteractables,
+      {
+        id: "molecular-structures-terminal",
+        object: terminalScreen,
+        prompt: "Press E to use molecular terminal",
+        interact: openMolecularPuzzle,
+      },
+    ];
     let yaw = 0;
     let pitch = 0;
     let sprinting = false;
@@ -862,6 +922,9 @@ export function ThreeScene() {
       glassMaterial.dispose();
       blackRubberMaterial.dispose();
       paperMaterial.dispose();
+      terminalBodyMaterial.dispose();
+      terminalTrimMaterial.dispose();
+      terminalScreenMaterial.dispose();
       amberChemicalMaterial.dispose();
       violetChemicalMaterial.dispose();
       pipeMaterial.dispose();
@@ -870,7 +933,6 @@ export function ThreeScene() {
       lampPanelMaterial.dispose();
       cylinderGeometry.dispose();
       beakerGeometry.dispose();
-      flaskGeometry.dispose();
       tubeGeometry.dispose();
       moleculeGeometries.forEach((geometry) => geometry.dispose());
       moleculeMaterials.forEach((material) => material.dispose());
@@ -879,12 +941,13 @@ export function ThreeScene() {
       wallTexture?.dispose();
       ceilingTexture?.dispose();
       doorTexture?.dispose();
+      terminalTexture.dispose();
       renderer.dispose();
       rendererCanvasRef.current = null;
     };
-  }, [closeNotebook, openNotebook, openPuzzle, showFeedbackMessage]);
+  }, [closeNotebook, openMolecularPuzzle, openNotebook, showFeedbackMessage]);
 
-  const isInterfaceOpen = isNotebookOpen || isPuzzleOpen;
+  const isInterfaceOpen = isNotebookOpen || isMolecularPuzzleOpen;
 
   return (
     <div ref={mountRef} className="fixed inset-0 cursor-crosshair">
@@ -925,12 +988,10 @@ export function ThreeScene() {
         isNotebookOpen={isNotebookOpen}
         onCloseNotebook={closeNotebook}
       />
-      <PuzzleModal
-        body="This is a reusable puzzle overlay opened from a Three.js raycast interaction."
-        isOpen={isPuzzleOpen}
-        onClose={closePuzzle}
-        onComplete={completeTestPuzzle}
-        title="Test Puzzle"
+      <MolecularPuzzleTerminal
+        isOpen={isMolecularPuzzleOpen}
+        onClose={closeMolecularPuzzle}
+        onComplete={completeMolecularPuzzle}
       />
     </div>
   );

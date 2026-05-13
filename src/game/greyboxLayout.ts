@@ -234,19 +234,19 @@ export const doorDefinitions: DoorDefinition[] = [
     id: "locked-room-door",
     label: "Locked Lab Door",
     requirement: {
-      puzzleIds: ["test-cube-puzzle"],
+      puzzleIds: ["molecular-structures"],
     },
     successMessage: "The locked lab door clicks open.",
-    failureMessage: "Locked: complete the chemical calibration puzzle first.",
+    failureMessage: "Locked: molecular structure clearance is required.",
   },
   {
     id: "final-exit-door",
     label: "Final Exit Door",
     requirement: {
-      inventoryItemIds: ["amber-test-cube"],
-      puzzleIds: ["test-cube-puzzle"],
+      inventoryItemIds: ["molecular-access-card"],
+      puzzleIds: ["molecular-structures"],
     },
     successMessage: "The final exit door releases with a heavy magnetic snap.",
-    failureMessage: "Sealed: the exit needs the Amber Cube and puzzle clearance.",
+    failureMessage: "Sealed: the exit needs molecular clearance and its access card.",
   },
 ];

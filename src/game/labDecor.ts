@@ -1,7 +1,7 @@
 import type { ColliderDefinition } from "@/src/game/collision";
 
 export type BoxProp = ColliderDefinition & {
-  material: "bench" | "cabinet" | "metal" | "hazard" | "glass";
+  material: "bench" | "cabinet" | "metal" | "hazard";
 };
 
 export type CylinderProp = {
@@ -23,7 +23,7 @@ export type LabLamp = {
 export const labBoxProps: BoxProp[] = [
   {
     id: "hub-map-table",
-    center: [0, 0.45, -2.6],
+    center: [0, 0.45, -1.25],
     size: [2.4, 0.9, 0.8],
     material: "bench",
   },
@@ -38,12 +38,6 @@ export const labBoxProps: BoxProp[] = [
     center: [0, 1.1, -11.55],
     size: [4.6, 2.2, 0.45],
     material: "metal",
-  },
-  {
-    id: "north-room-glass-case",
-    center: [1.9, 0.8, -7.6],
-    size: [0.7, 1.6, 1.5],
-    material: "glass",
   },
   {
     id: "east-room-workbench",

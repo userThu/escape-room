@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
+  <g fill="none" stroke="#9ca5b1" stroke-width="3" opacity="0.8">
+    <path d="M65 45 H175 V125 H65 Z" />
+    <path d="M85 25 H195 V105 H85 Z" />
+    <path d="M65 45 L85 25" />
+    <path d="M175 45 L195 25" />
+    <path d="M175 125 L195 105" />
+    <path d="M65 125 L85 105" />
+    <path d="M120 45 V125" />
+    <path d="M65 85 H175" />
+  </g>
+  <g stroke="#c4cad1" stroke-width="3">
+    <circle cx="65" cy="45" r="12" fill="#7188a6" />
+    <circle cx="175" cy="45" r="12" fill="#7188a6" />
+    <circle cx="65" cy="125" r="12" fill="#7188a6" />
+    <circle cx="175" cy="125" r="12" fill="#7188a6" />
+    <circle cx="120" cy="85" r="12" fill="#7188a6" />
+    <circle cx="85" cy="25" r="10" fill="#a9825e" />
+    <circle cx="195" cy="25" r="10" fill="#a9825e" />
+    <circle cx="85" cy="105" r="10" fill="#a9825e" />
+    <circle cx="195" cy="105" r="10" fill="#a9825e" />
+    <circle cx="120" cy="45" r="10" fill="#a9825e" />
+    <circle cx="120" cy="125" r="10" fill="#a9825e" />
+  </g>
+</svg>
