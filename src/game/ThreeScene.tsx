@@ -17,6 +17,7 @@ import {
   labLamps,
   labPropColliderDefinitions,
 } from "@/src/game/labDecor";
+import { molecularStructureDecals } from "@/src/game/molecularStructuresRoom";
 import {
   getTargetedInteractable,
   type Interactable,
@@ -226,6 +227,9 @@ export function ThreeScene() {
     mount.appendChild(renderer.domElement);
 
     const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const moleculeTextures: THREE.Texture[] = [];
+    const moleculeMaterials: THREE.Material[] = [];
+    const moleculeGeometries: THREE.BufferGeometry[] = [];
     const floorTexture = createCanvasTexture("#343c47", "#242b34", "#6b5e48");
     const wallTexture = createCanvasTexture("#7d8587", "#656d70", "#2f383a");
     const ceilingTexture = createCanvasTexture("#5f686b", "#485154", "#252b2e");
@@ -298,11 +302,6 @@ export function ThreeScene() {
       metalness: 0.02,
       transparent: true,
     });
-    const barrelMaterial = new THREE.MeshStandardMaterial({
-      color: 0x166534,
-      roughness: 0.58,
-      metalness: 0.2,
-    });
     const pipeMaterial = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       roughness: 0.48,
@@ -312,13 +311,6 @@ export function ThreeScene() {
       color: 0xa3a3a3,
       roughness: 0.38,
       metalness: 0.62,
-    });
-    const spillMaterial = new THREE.MeshStandardMaterial({
-      color: 0x22c55e,
-      emissive: 0x052e16,
-      opacity: 0.58,
-      roughness: 0.35,
-      transparent: true,
     });
     const blackRubberMaterial = new THREE.MeshStandardMaterial({
       color: 0x111827,
@@ -330,18 +322,18 @@ export function ThreeScene() {
       roughness: 0.9,
       metalness: 0,
     });
-    const redChemicalMaterial = new THREE.MeshStandardMaterial({
-      color: 0xdc2626,
-      emissive: 0x450a0a,
-      opacity: 0.72,
-      roughness: 0.24,
+    const amberChemicalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb7793a,
+      emissive: 0x2f1708,
+      opacity: 0.66,
+      roughness: 0.28,
       transparent: true,
     });
-    const blueChemicalMaterial = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x082f49,
-      opacity: 0.64,
-      roughness: 0.2,
+    const violetChemicalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8b7aa8,
+      emissive: 0x1f1830,
+      opacity: 0.62,
+      roughness: 0.3,
       transparent: true,
     });
     const lampHousingMaterial = new THREE.MeshStandardMaterial({
@@ -357,14 +349,12 @@ export function ThreeScene() {
       metalness: 0.02,
     });
     const propMaterials = {
-      barrel: barrelMaterial,
       bench: benchMaterial,
       cabinet: cabinetMaterial,
       glass: glassMaterial,
       hazard: hazardMaterial,
       metal: metalMaterial,
       pipe: pipeMaterial,
-      spill: spillMaterial,
       tank: tankMaterial,
     };
     const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -409,6 +399,34 @@ export function ThreeScene() {
       return component;
     };
 
+    const addVialRack = (
+      group: THREE.Group,
+      position: [number, number, number],
+    ) => {
+      addBoxComponent(group, blackRubberMaterial, position, [0.48, 0.05, 0.18]);
+
+      [-0.16, 0, 0.16].forEach((offset, index) => {
+        const tubeX = position[0] + offset;
+        const tubeY = position[1] + 0.18;
+        const liquidMaterial =
+          index % 2 === 0 ? amberChemicalMaterial : violetChemicalMaterial;
+
+        addCylinderComponent(
+          group,
+          tubeGeometry,
+          glassMaterial,
+          [tubeX, tubeY, position[2]],
+          [0.9, 0.8, 0.9],
+        );
+        addBoxComponent(
+          group,
+          liquidMaterial,
+          [tubeX, tubeY - 0.08, position[2]],
+          [0.045, 0.12, 0.045],
+        );
+      });
+    };
+
     const createLabFurniture = ({
       material,
       size,
@@ -426,8 +444,9 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [width * 0.4, 0, depth * 0.38], [0.12, height, 0.12]);
         addBoxComponent(group, metalMaterial, [0, -height * 0.18, 0], [width * 0.82, 0.08, depth * 0.82]);
         addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.22, height / 2 + 0.16, 0], [1, 1, 1]);
-        addCylinderComponent(group, cylinderGeometry, blueChemicalMaterial, [-width * 0.22, height / 2 + 0.02, 0], [0.13, 0.16, 0.13]);
+        addBoxComponent(group, amberChemicalMaterial, [-width * 0.22, height / 2 + 0.04, 0], [0.18, 0.1, 0.18]);
         addBoxComponent(group, paperMaterial, [width * 0.22, height / 2 + 0.02, depth * 0.08], [0.5, 0.02, 0.34]);
+        addVialRack(group, [width * 0.08, height / 2 + 0.04, -depth * 0.22]);
       } else if (material === "cabinet") {
         addBoxComponent(group, cabinetMaterial, [0, 0, 0], [width, height, depth]);
         addBoxComponent(group, metalMaterial, [0, 0, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
@@ -442,16 +461,15 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, -depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [-width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
-        addCylinderComponent(group, cylinderGeometry, redChemicalMaterial, [-width * 0.22, height * 0.1, 0], [0.09, 0.36, 0.09]);
-        addCylinderComponent(group, cylinderGeometry, blueChemicalMaterial, [width * 0.15, -height * 0.18, 0], [0.08, 0.3, 0.08]);
+        addVialRack(group, [0, height * 0.36, 0]);
       } else if (material === "glass") {
         addBoxComponent(group, metalMaterial, [0, -height * 0.48, 0], [width, height * 0.06, depth]);
         addBoxComponent(group, metalMaterial, [0, height * 0.48, 0], [width, height * 0.06, depth]);
         addBoxComponent(group, glassMaterial, [0, 0, -depth * 0.47], [width, height, 0.04]);
         addBoxComponent(group, glassMaterial, [-width * 0.48, 0, 0], [0.04, height, depth]);
         addBoxComponent(group, glassMaterial, [width * 0.48, 0, 0], [0.04, height, depth]);
-        addCylinderComponent(group, flaskGeometry, blueChemicalMaterial, [-width * 0.18, -height * 0.08, 0], [1, 1.2, 1]);
-        addCylinderComponent(group, tubeGeometry, redChemicalMaterial, [width * 0.18, 0, 0], [1, 1, 1]);
+        addCylinderComponent(group, flaskGeometry, glassMaterial, [-width * 0.18, -height * 0.08, 0], [1, 1.2, 1]);
+        addCylinderComponent(group, tubeGeometry, glassMaterial, [width * 0.18, 0, 0], [1, 1, 1]);
       } else {
         addBoxComponent(group, hazardMaterial, [0, 0, 0], [width, height, depth]);
         addBoxComponent(group, blackRubberMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
@@ -496,7 +514,7 @@ export function ThreeScene() {
 
       prop.position.set(center[0], center[1], center[2]);
       prop.scale.set(radius, depth, radius);
-      prop.castShadow = material !== "spill";
+      prop.castShadow = true;
       prop.receiveShadow = true;
 
       if (rotation) {
@@ -525,6 +543,30 @@ export function ThreeScene() {
       lamp.castShadow = false;
       scene.add(lamp);
     });
+
+    molecularStructureDecals.forEach(
+      ({ position, rotation, size, texturePath }) => {
+        const texture = new THREE.TextureLoader().load(texturePath);
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          map: texture,
+          side: THREE.DoubleSide,
+          transparent: true,
+        });
+        const decal = new THREE.Mesh(
+          new THREE.PlaneGeometry(size[0], size[1]),
+          material,
+        );
+
+        texture.colorSpace = THREE.SRGBColorSpace;
+        moleculeTextures.push(texture);
+        moleculeMaterials.push(material);
+        moleculeGeometries.push(decal.geometry);
+        decal.position.set(position[0], position[1], position[2]);
+        decal.rotation.set(rotation[0], rotation[1], rotation[2]);
+        scene.add(decal);
+      },
+    );
 
     const ambientLight = new THREE.HemisphereLight(0xe0f2fe, 0x1f2937, 1.1);
     scene.add(ambientLight);
@@ -820,18 +862,19 @@ export function ThreeScene() {
       glassMaterial.dispose();
       blackRubberMaterial.dispose();
       paperMaterial.dispose();
-      redChemicalMaterial.dispose();
-      blueChemicalMaterial.dispose();
-      barrelMaterial.dispose();
+      amberChemicalMaterial.dispose();
+      violetChemicalMaterial.dispose();
       pipeMaterial.dispose();
       tankMaterial.dispose();
-      spillMaterial.dispose();
       lampHousingMaterial.dispose();
       lampPanelMaterial.dispose();
       cylinderGeometry.dispose();
       beakerGeometry.dispose();
       flaskGeometry.dispose();
       tubeGeometry.dispose();
+      moleculeGeometries.forEach((geometry) => geometry.dispose());
+      moleculeMaterials.forEach((material) => material.dispose());
+      moleculeTextures.forEach((texture) => texture.dispose());
       floorTexture?.dispose();
       wallTexture?.dispose();
       ceilingTexture?.dispose();

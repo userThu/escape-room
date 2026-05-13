@@ -9,7 +9,7 @@ export type CylinderProp = {
   center: [number, number, number];
   radius: number;
   depth: number;
-  material: "barrel" | "pipe" | "tank" | "spill";
+  material: "pipe" | "tank";
   rotation?: [number, number, number];
 };
 
@@ -85,20 +85,6 @@ export const labBoxProps: BoxProp[] = [
 
 export const labCylinderProps: CylinderProp[] = [
   {
-    id: "north-room-acid-barrel",
-    center: [2.25, 0.55, -10.6],
-    radius: 0.45,
-    depth: 1.1,
-    material: "barrel",
-  },
-  {
-    id: "east-room-solvent-barrel",
-    center: [10.8, 0.55, 2.1],
-    radius: 0.45,
-    depth: 1.1,
-    material: "barrel",
-  },
-  {
     id: "locked-room-pressure-tank",
     center: [-10.6, 0.9, -2.1],
     radius: 0.38,
@@ -120,20 +106,6 @@ export const labCylinderProps: CylinderProp[] = [
     depth: 6.2,
     material: "pipe",
     rotation: [0, Math.PI / 2, 0],
-  },
-  {
-    id: "north-room-spill",
-    center: [-0.8, 0.02, -9.3],
-    radius: 0.85,
-    depth: 0.025,
-    material: "spill",
-  },
-  {
-    id: "east-room-spill",
-    center: [9.7, 0.02, -0.7],
-    radius: 0.65,
-    depth: 0.025,
-    material: "spill",
   },
 ];
 
