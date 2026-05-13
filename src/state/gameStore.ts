@@ -113,6 +113,23 @@ export function selectInventoryItemByIndex(index: number) {
   }));
 }
 
+export function removeInventoryItem(itemId: string) {
+  setGameState((state) => {
+    const inventoryItems = state.inventoryItems.filter(
+      ({ id }) => id !== itemId,
+    );
+
+    return {
+      ...state,
+      inventoryItems,
+      selectedInventoryItemId:
+        state.selectedInventoryItemId === itemId
+          ? (inventoryItems[0]?.id ?? null)
+          : state.selectedInventoryItemId,
+    };
+  });
+}
+
 export function unlockDoor(doorId: string) {
   setGameState((state) => ({
     ...state,

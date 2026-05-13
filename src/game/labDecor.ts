@@ -1,7 +1,7 @@
 import type { ColliderDefinition } from "@/src/game/collision";
 
 export type BoxProp = ColliderDefinition & {
-  material: "bench" | "cabinet" | "machine" | "metal" | "hazard";
+  material: "bench" | "cabinet" | "machine" | "metal" | "hazard" | "wallShelf";
 };
 
 export type CylinderProp = {
@@ -28,16 +28,34 @@ export const labBoxProps: BoxProp[] = [
     material: "bench",
   },
   {
+    id: "hub-north-left-wall-shelf",
+    center: [-2.78, 2.05, -3.78],
+    size: [1.8, 0.16, 0.42],
+    material: "wallShelf",
+  },
+  {
+    id: "hub-north-right-wall-shelf",
+    center: [2.78, 2.05, -3.78],
+    size: [1.8, 0.16, 0.42],
+    material: "wallShelf",
+  },
+  {
+    id: "hub-west-wall-shelf",
+    center: [-3.78, 1.92, 2.3],
+    size: [0.42, 0.16, 2.05],
+    material: "wallShelf",
+  },
+  {
+    id: "hub-east-wall-shelf",
+    center: [3.78, 1.92, 2.3],
+    size: [0.42, 0.16, 2.05],
+    material: "wallShelf",
+  },
+  {
     id: "north-room-left-bench",
     center: [-2.15, 0.5, -8],
     size: [0.7, 1, 4.6],
     material: "bench",
-  },
-  {
-    id: "north-room-back-shelf",
-    center: [0, 1.1, -11.55],
-    size: [4.6, 2.2, 0.45],
-    material: "metal",
   },
   {
     id: "east-room-workbench",
@@ -47,8 +65,8 @@ export const labBoxProps: BoxProp[] = [
   },
   {
     id: "east-room-cabinet-bank",
-    center: [11.45, 1, 0],
-    size: [0.55, 2, 3.4],
+    center: [11.38, 1.25, 0],
+    size: [0.7, 2.5, 3.45],
     material: "cabinet",
   },
   {
@@ -136,6 +154,6 @@ export const labLamps: LabLamp[] = [
   },
 ];
 
-export const labPropColliderDefinitions: ColliderDefinition[] = labBoxProps.map(
-  ({ center, id, size }) => ({ center, id, size }),
-);
+export const labPropColliderDefinitions: ColliderDefinition[] = labBoxProps
+  .filter(({ material }) => material !== "wallShelf")
+  .map(({ center, id, size }) => ({ center, id, size }));

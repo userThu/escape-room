@@ -13,13 +13,11 @@ export function getTargetedInteractable(
   camera: THREE.Camera,
   raycaster: THREE.Raycaster,
   interactables: Interactable[],
+  interactableObjects = interactables.map(({ object }) => object),
 ) {
   raycaster.setFromCamera(cameraCenter, camera);
 
-  const intersections = raycaster.intersectObjects(
-    interactables.map(({ object }) => object),
-    false,
-  );
+  const intersections = raycaster.intersectObjects(interactableObjects, false);
   const targetedObject = intersections[0]?.object;
 
   if (!targetedObject) {
