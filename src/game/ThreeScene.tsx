@@ -5,8 +5,17 @@ import * as THREE from "three";
 import {
   collidesWithStaticGeometry,
   createAabbCollider,
-  staticColliderDefinitions,
 } from "@/src/game/collision";
+import {
+  greyboxBlocks,
+  greyboxColliderDefinitions,
+} from "@/src/game/greyboxLayout";
+import {
+  labBoxProps,
+  labCylinderProps,
+  labLamps,
+  labPropColliderDefinitions,
+} from "@/src/game/labDecor";
 import {
   getTargetedInteractable,
   type Interactable,
@@ -27,6 +36,58 @@ const sprintSpeed = 7;
 const mouseSensitivity = 0.002;
 const maxPitch = Math.PI / 2 - 0.05;
 const interactionRange = 3;
+
+function createCanvasTexture(
+  baseColor: string,
+  lineColor: string,
+  accentColor: string,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.fillStyle = baseColor;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = lineColor;
+  context.lineWidth = 3;
+
+  for (let position = 0; position <= 256; position += 64) {
+    context.beginPath();
+    context.moveTo(position, 0);
+    context.lineTo(position, 256);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(0, position);
+    context.lineTo(256, position);
+    context.stroke();
+  }
+
+  context.fillStyle = accentColor;
+
+  for (let index = 0; index < 22; index += 1) {
+    const x = (index * 53) % 256;
+    const y = (index * 97) % 256;
+    const width = 8 + ((index * 11) % 28);
+    const height = 3 + ((index * 7) % 14);
+    context.globalAlpha = 0.16;
+    context.fillRect(x, y, width, height);
+  }
+
+  context.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  return texture;
+}
 
 export function ThreeScene() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -121,7 +182,7 @@ export function ThreeScene() {
       0.1,
       100,
     );
-    camera.position.set(0, playerHeight, 6);
+    camera.position.set(0, playerHeight, 0);
     camera.rotation.order = "YXZ";
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -132,63 +193,324 @@ export function ThreeScene() {
     rendererCanvasRef.current = renderer.domElement;
     mount.appendChild(renderer.domElement);
 
-    const floorGeometry = new THREE.PlaneGeometry(24, 24);
+    const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const floorTexture = createCanvasTexture("#343c47", "#242b34", "#6b5e48");
+    const wallTexture = createCanvasTexture("#7d8587", "#656d70", "#2f383a");
+    const ceilingTexture = createCanvasTexture("#5f686b", "#485154", "#252b2e");
+    const doorTexture = createCanvasTexture("#343a40", "#24282d", "#7c2d12");
+
+    if (floorTexture) {
+      floorTexture.repeat.set(3, 3);
+    }
+
+    if (wallTexture) {
+      wallTexture.repeat.set(2, 2);
+    }
+
+    if (ceilingTexture) {
+      ceilingTexture.repeat.set(2, 2);
+    }
+
+    if (doorTexture) {
+      doorTexture.repeat.set(1, 1);
+    }
+
     const floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x243042,
+      color: 0x2b3442,
+      map: floorTexture,
       roughness: 0.82,
       metalness: 0.08,
     });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const interactableGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const interactableMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      roughness: 0.5,
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8b949e,
+      map: wallTexture,
+      roughness: 0.9,
+      metalness: 0.02,
+    });
+    const ceilingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x6b7280,
+      map: ceilingTexture,
+      roughness: 0.88,
+      metalness: 0.04,
+    });
+    const doorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x343a40,
+      map: doorTexture,
+      roughness: 0.72,
+      metalness: 0.18,
+    });
+    const benchMaterial = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.7,
+      metalness: 0.18,
+    });
+    const cabinetMaterial = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.62,
+      metalness: 0.28,
+    });
+    const metalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      roughness: 0.55,
+      metalness: 0.35,
+    });
+    const hazardMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.52,
+      metalness: 0.08,
+    });
+    const glassMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8ecae6,
+      opacity: 0.42,
+      roughness: 0.08,
+      metalness: 0.02,
+      transparent: true,
+    });
+    const barrelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x166534,
+      roughness: 0.58,
+      metalness: 0.2,
+    });
+    const pipeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      roughness: 0.48,
+      metalness: 0.55,
+    });
+    const tankMaterial = new THREE.MeshStandardMaterial({
+      color: 0xa3a3a3,
+      roughness: 0.38,
+      metalness: 0.62,
+    });
+    const spillMaterial = new THREE.MeshStandardMaterial({
+      color: 0x22c55e,
+      emissive: 0x052e16,
+      opacity: 0.58,
+      roughness: 0.35,
+      transparent: true,
+    });
+    const blackRubberMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111827,
+      roughness: 0.68,
       metalness: 0.12,
     });
-    const interactableCube = new THREE.Mesh(
-      interactableGeometry,
-      interactableMaterial,
-    );
-    interactableCube.position.set(0, playerHeight, 3.4);
-    interactableCube.castShadow = true;
-    scene.add(interactableCube);
+    const paperMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe5e7eb,
+      roughness: 0.9,
+      metalness: 0,
+    });
+    const redChemicalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xdc2626,
+      emissive: 0x450a0a,
+      opacity: 0.72,
+      roughness: 0.24,
+      transparent: true,
+    });
+    const blueChemicalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x082f49,
+      opacity: 0.64,
+      roughness: 0.2,
+      transparent: true,
+    });
+    const lampHousingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      roughness: 0.58,
+      metalness: 0.44,
+    });
+    const lampPanelMaterial = new THREE.MeshStandardMaterial({
+      color: 0xdbeafe,
+      emissive: 0xbfdcff,
+      emissiveIntensity: 1.9,
+      roughness: 0.22,
+      metalness: 0.02,
+    });
+    const propMaterials = {
+      barrel: barrelMaterial,
+      bench: benchMaterial,
+      cabinet: cabinetMaterial,
+      glass: glassMaterial,
+      hazard: hazardMaterial,
+      metal: metalMaterial,
+      pipe: pipeMaterial,
+      spill: spillMaterial,
+      tank: tankMaterial,
+    };
+    const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 16);
+    const beakerGeometry = new THREE.CylinderGeometry(0.18, 0.16, 0.42, 16, 1, true);
+    const flaskGeometry = new THREE.SphereGeometry(0.2, 16, 8);
+    const tubeGeometry = new THREE.CylinderGeometry(0.045, 0.045, 0.42, 12);
 
-    const ambientLight = new THREE.HemisphereLight(0xe0f2fe, 0x1f2937, 1.8);
+    const addBoxComponent = (
+      group: THREE.Group,
+      material: THREE.Material,
+      position: [number, number, number],
+      scale: [number, number, number],
+    ) => {
+      const component = new THREE.Mesh(blockGeometry, material);
+
+      component.position.set(position[0], position[1], position[2]);
+      component.scale.set(scale[0], scale[1], scale[2]);
+      component.castShadow = true;
+      component.receiveShadow = true;
+      group.add(component);
+
+      return component;
+    };
+
+    const addCylinderComponent = (
+      group: THREE.Group,
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      position: [number, number, number],
+      scale: [number, number, number],
+      rotation: [number, number, number] = [0, 0, 0],
+    ) => {
+      const component = new THREE.Mesh(geometry, material);
+
+      component.position.set(position[0], position[1], position[2]);
+      component.scale.set(scale[0], scale[1], scale[2]);
+      component.rotation.set(rotation[0], rotation[1], rotation[2]);
+      component.castShadow = true;
+      component.receiveShadow = true;
+      group.add(component);
+
+      return component;
+    };
+
+    const createLabFurniture = ({
+      material,
+      size,
+    }: (typeof labBoxProps)[number]) => {
+      const group = new THREE.Group();
+      const width = size[0];
+      const height = size[1];
+      const depth = size[2];
+
+      if (material === "bench") {
+        addBoxComponent(group, benchMaterial, [0, height / 2 - 0.08, 0], [width, 0.16, depth]);
+        addBoxComponent(group, metalMaterial, [-width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
+        addBoxComponent(group, metalMaterial, [width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
+        addBoxComponent(group, metalMaterial, [-width * 0.4, 0, depth * 0.38], [0.12, height, 0.12]);
+        addBoxComponent(group, metalMaterial, [width * 0.4, 0, depth * 0.38], [0.12, height, 0.12]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.18, 0], [width * 0.82, 0.08, depth * 0.82]);
+        addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.22, height / 2 + 0.16, 0], [1, 1, 1]);
+        addCylinderComponent(group, cylinderGeometry, blueChemicalMaterial, [-width * 0.22, height / 2 + 0.02, 0], [0.13, 0.16, 0.13]);
+        addBoxComponent(group, paperMaterial, [width * 0.22, height / 2 + 0.02, depth * 0.08], [0.5, 0.02, 0.34]);
+      } else if (material === "cabinet") {
+        addBoxComponent(group, cabinetMaterial, [0, 0, 0], [width, height, depth]);
+        addBoxComponent(group, metalMaterial, [0, 0, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
+        addBoxComponent(group, metalMaterial, [0, height * 0.24, -depth / 2 - 0.02], [width * 0.9, height * 0.04, 0.04]);
+        addBoxComponent(group, blackRubberMaterial, [0, -height * 0.12, -depth / 2 - 0.04], [width * 0.08, height * 0.36, 0.04]);
+        addBoxComponent(group, hazardMaterial, [0, height * 0.38, -depth / 2 - 0.05], [width * 0.45, height * 0.12, 0.03]);
+      } else if (material === "metal") {
+        addBoxComponent(group, metalMaterial, [0, 0, 0], [width, height * 0.08, depth]);
+        addBoxComponent(group, metalMaterial, [0, height * 0.28, 0], [width, height * 0.08, depth]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.28, 0], [width, height * 0.08, depth]);
+        addBoxComponent(group, metalMaterial, [-width * 0.45, 0, -depth * 0.4], [0.08, height, 0.08]);
+        addBoxComponent(group, metalMaterial, [width * 0.45, 0, -depth * 0.4], [0.08, height, 0.08]);
+        addBoxComponent(group, metalMaterial, [-width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
+        addBoxComponent(group, metalMaterial, [width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
+        addCylinderComponent(group, cylinderGeometry, redChemicalMaterial, [-width * 0.22, height * 0.1, 0], [0.09, 0.36, 0.09]);
+        addCylinderComponent(group, cylinderGeometry, blueChemicalMaterial, [width * 0.15, -height * 0.18, 0], [0.08, 0.3, 0.08]);
+      } else if (material === "glass") {
+        addBoxComponent(group, metalMaterial, [0, -height * 0.48, 0], [width, height * 0.06, depth]);
+        addBoxComponent(group, metalMaterial, [0, height * 0.48, 0], [width, height * 0.06, depth]);
+        addBoxComponent(group, glassMaterial, [0, 0, -depth * 0.47], [width, height, 0.04]);
+        addBoxComponent(group, glassMaterial, [-width * 0.48, 0, 0], [0.04, height, depth]);
+        addBoxComponent(group, glassMaterial, [width * 0.48, 0, 0], [0.04, height, depth]);
+        addCylinderComponent(group, flaskGeometry, blueChemicalMaterial, [-width * 0.18, -height * 0.08, 0], [1, 1.2, 1]);
+        addCylinderComponent(group, tubeGeometry, redChemicalMaterial, [width * 0.18, 0, 0], [1, 1, 1]);
+      } else {
+        addBoxComponent(group, hazardMaterial, [0, 0, 0], [width, height, depth]);
+        addBoxComponent(group, blackRubberMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
+        addBoxComponent(group, blackRubberMaterial, [0, -height * 0.04, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
+      }
+
+      return group;
+    };
+
+    greyboxBlocks.forEach(({ center, kind, size }) => {
+      const material =
+        kind === "floor"
+          ? floorMaterial
+          : kind === "ceiling"
+            ? ceilingMaterial
+            : kind === "door"
+              ? doorMaterial
+              : wallMaterial;
+      const block = new THREE.Mesh(blockGeometry, material);
+
+      block.position.set(center[0], center[1], center[2]);
+      block.scale.set(size[0], size[1], size[2]);
+      block.castShadow = kind !== "floor";
+      block.receiveShadow = true;
+      scene.add(block);
+    });
+
+    labBoxProps.forEach((definition) => {
+      const prop = createLabFurniture(definition);
+      const { center } = definition;
+
+      prop.position.set(center[0], center[1], center[2]);
+      scene.add(prop);
+    });
+
+    labCylinderProps.forEach(({ center, depth, material, radius, rotation }) => {
+      const prop = new THREE.Mesh(cylinderGeometry, propMaterials[material]);
+
+      prop.position.set(center[0], center[1], center[2]);
+      prop.scale.set(radius, depth, radius);
+      prop.castShadow = material !== "spill";
+      prop.receiveShadow = true;
+
+      if (rotation) {
+        prop.rotation.set(rotation[0], rotation[1], rotation[2]);
+      }
+
+      scene.add(prop);
+    });
+
+    labLamps.forEach(({ center, intensity, size }) => {
+      const housing = new THREE.Mesh(blockGeometry, lampHousingMaterial);
+      const panel = new THREE.Mesh(blockGeometry, lampPanelMaterial);
+      const lamp = new THREE.PointLight(0xdbeafe, intensity, 8);
+
+      housing.position.set(center[0], center[1] + 0.035, center[2]);
+      housing.scale.set(size[0] + 0.18, size[1], size[2] + 0.18);
+      housing.castShadow = false;
+      housing.receiveShadow = true;
+      scene.add(housing);
+
+      panel.position.set(center[0], center[1] - 0.025, center[2]);
+      panel.scale.set(size[0], size[1], size[2]);
+      scene.add(panel);
+
+      lamp.position.set(center[0], center[1] - 0.25, center[2]);
+      lamp.castShadow = false;
+      scene.add(lamp);
+    });
+
+    const ambientLight = new THREE.HemisphereLight(0xe0f2fe, 0x1f2937, 1.1);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
     keyLight.position.set(4, 6, 3);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
     scene.add(keyLight);
-
-    const fillLight = new THREE.PointLight(0xfbbf24, 28, 16);
-    fillLight.position.set(-3, 2.5, -2);
-    scene.add(fillLight);
 
     const pressedKeys = new Set<string>();
     const moveDirection = new THREE.Vector3();
     const nextPosition = new THREE.Vector3();
     const forward = new THREE.Vector3();
     const right = new THREE.Vector3();
-    const staticColliders = staticColliderDefinitions.map(createAabbCollider);
+    const staticColliders = [
+      ...greyboxColliderDefinitions,
+      ...labPropColliderDefinitions,
+    ].map(createAabbCollider);
     const raycaster = new THREE.Raycaster();
     raycaster.far = interactionRange;
-    const interactables: Interactable[] = [
-      {
-        id: "test-cube",
-        object: interactableCube,
-        prompt: "Press E to interact",
-        interact: () => {
-          console.log("Interacted with the test cube.");
-          openPuzzle();
-        },
-      },
-    ];
+    const interactables: Interactable[] = [];
     let yaw = 0;
     let pitch = 0;
     let sprinting = false;
@@ -400,10 +722,34 @@ export function ThreeScene() {
         mount.removeChild(renderer.domElement);
       }
 
-      floorGeometry.dispose();
+      blockGeometry.dispose();
       floorMaterial.dispose();
-      interactableGeometry.dispose();
-      interactableMaterial.dispose();
+      wallMaterial.dispose();
+      ceilingMaterial.dispose();
+      doorMaterial.dispose();
+      benchMaterial.dispose();
+      cabinetMaterial.dispose();
+      metalMaterial.dispose();
+      hazardMaterial.dispose();
+      glassMaterial.dispose();
+      blackRubberMaterial.dispose();
+      paperMaterial.dispose();
+      redChemicalMaterial.dispose();
+      blueChemicalMaterial.dispose();
+      barrelMaterial.dispose();
+      pipeMaterial.dispose();
+      tankMaterial.dispose();
+      spillMaterial.dispose();
+      lampHousingMaterial.dispose();
+      lampPanelMaterial.dispose();
+      cylinderGeometry.dispose();
+      beakerGeometry.dispose();
+      flaskGeometry.dispose();
+      tubeGeometry.dispose();
+      floorTexture?.dispose();
+      wallTexture?.dispose();
+      ceilingTexture?.dispose();
+      doorTexture?.dispose();
       renderer.dispose();
       rendererCanvasRef.current = null;
     };
