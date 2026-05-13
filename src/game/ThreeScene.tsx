@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   collidesWithStaticGeometry,
@@ -11,6 +11,14 @@ import {
   getTargetedInteractable,
   type Interactable,
 } from "@/src/game/interactions";
+import {
+  addInventoryItem,
+  completePuzzle,
+  recordResponse,
+  selectInventoryItemByIndex,
+} from "@/src/state";
+import { GameHud } from "@/src/ui/GameHud";
+import { PuzzleModal } from "@/src/ui/PuzzleModal";
 
 const playerHeight = 1.7;
 const playerRadius = 0.35;
@@ -22,12 +30,80 @@ const interactionRange = 3;
 
 export function ThreeScene() {
   const mountRef = useRef<HTMLDivElement>(null);
+  const activeInterfaceRef = useRef<"notebook" | "puzzle" | null>(null);
+  const isPlayerPausedRef = useRef(false);
+  const rendererCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const targetedInteractableRef = useRef<Interactable | null>(null);
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [isSprinting, setIsSprinting] = useState(false);
+  const [isNotebookOpen, setIsNotebookOpen] = useState(false);
+  const [isPuzzleOpen, setIsPuzzleOpen] = useState(false);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
   );
+
+  const releasePointerLock = useCallback(() => {
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }, []);
+
+  const requestPointerLockAfterInterface = useCallback(() => {
+    if (!rendererCanvasRef.current || document.pointerLockElement) {
+      return;
+    }
+
+    void rendererCanvasRef.current.requestPointerLock().catch(() => {
+      setIsPointerLocked(false);
+    });
+  }, []);
+
+  const pausePlayerForInterface = useCallback(() => {
+    isPlayerPausedRef.current = true;
+    setIsSprinting(false);
+    setInteractionPrompt(null);
+    releasePointerLock();
+  }, [releasePointerLock]);
+
+  const resumePlayerFromInterface = useCallback(() => {
+    isPlayerPausedRef.current = false;
+    activeInterfaceRef.current = null;
+    requestPointerLockAfterInterface();
+  }, [requestPointerLockAfterInterface]);
+
+  const openNotebook = useCallback(() => {
+    activeInterfaceRef.current = "notebook";
+    pausePlayerForInterface();
+    setIsNotebookOpen(true);
+  }, [pausePlayerForInterface]);
+
+  const closeNotebook = useCallback(() => {
+    setIsNotebookOpen(false);
+    resumePlayerFromInterface();
+  }, [resumePlayerFromInterface]);
+
+  const openPuzzle = useCallback(() => {
+    activeInterfaceRef.current = "puzzle";
+    pausePlayerForInterface();
+    setIsPuzzleOpen(true);
+  }, [pausePlayerForInterface]);
+
+  const closePuzzle = useCallback(() => {
+    setIsPuzzleOpen(false);
+    resumePlayerFromInterface();
+  }, [resumePlayerFromInterface]);
+
+  const completeTestPuzzle = useCallback(() => {
+    console.log("Completed the test puzzle.");
+    completePuzzle("test-cube-puzzle");
+    addInventoryItem({
+      id: "amber-test-cube",
+      name: "Amber Cube",
+      description: "A warm, geometric sample from the interaction test.",
+    });
+    recordResponse("test-cube-puzzle", "Player completed the test puzzle.");
+    closePuzzle();
+  }, [closePuzzle]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -53,6 +129,7 @@ export function ThreeScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
+    rendererCanvasRef.current = renderer.domElement;
     mount.appendChild(renderer.domElement);
 
     const floorGeometry = new THREE.PlaneGeometry(24, 24);
@@ -108,6 +185,7 @@ export function ThreeScene() {
         prompt: "Press E to interact",
         interact: () => {
           console.log("Interacted with the test cube.");
+          openPuzzle();
         },
       },
     ];
@@ -115,7 +193,15 @@ export function ThreeScene() {
     let pitch = 0;
     let sprinting = false;
 
-    const requestPointerLock = () => {
+    const requestPointerLock = (event: MouseEvent) => {
+      if (
+        isPlayerPausedRef.current ||
+        event.target !== renderer.domElement ||
+        document.pointerLockElement === renderer.domElement
+      ) {
+        return;
+      }
+
       void renderer.domElement.requestPointerLock().catch(() => {
         setIsPointerLocked(false);
       });
@@ -126,7 +212,10 @@ export function ThreeScene() {
     };
 
     const handleMouseMove = (event: MouseEvent) => {
-      if (document.pointerLockElement !== renderer.domElement) {
+      if (
+        isPlayerPausedRef.current ||
+        document.pointerLockElement !== renderer.domElement
+      ) {
         return;
       }
 
@@ -140,7 +229,42 @@ export function ThreeScene() {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight"].includes(event.code)) {
+      if (event.code === "KeyJ" && !event.repeat) {
+        event.preventDefault();
+
+        if (activeInterfaceRef.current === "notebook") {
+          closeNotebook();
+        } else if (isPlayerPausedRef.current) {
+          return;
+        } else {
+          pressedKeys.clear();
+          sprinting = false;
+          setIsSprinting(false);
+          openNotebook();
+        }
+
+        return;
+      }
+
+      if (/^Digit[1-9]$/.test(event.code) && !event.repeat) {
+        if (isPlayerPausedRef.current) {
+          return;
+        }
+
+        event.preventDefault();
+        selectInventoryItemByIndex(Number(event.code.slice(5)) - 1);
+        return;
+      }
+
+      if (isPlayerPausedRef.current) {
+        return;
+      }
+
+      if (
+        ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight"].includes(
+          event.code,
+        )
+      ) {
         event.preventDefault();
       }
 
@@ -152,6 +276,9 @@ export function ThreeScene() {
 
       if (event.code === "KeyE" && !event.repeat) {
         event.preventDefault();
+        pressedKeys.clear();
+        sprinting = false;
+        setIsSprinting(false);
         targetedInteractableRef.current?.interact();
         return;
       }
@@ -183,6 +310,12 @@ export function ThreeScene() {
       const now = performance.now();
       const deltaSeconds = Math.min((now - previousFrameAt) / 1000, 0.1);
       previousFrameAt = now;
+
+      if (isPlayerPausedRef.current) {
+        renderer.render(scene, camera);
+        animationFrameId = window.requestAnimationFrame(animate);
+        return;
+      }
 
       moveDirection.set(0, 0, 0);
 
@@ -272,11 +405,17 @@ export function ThreeScene() {
       interactableGeometry.dispose();
       interactableMaterial.dispose();
       renderer.dispose();
+      rendererCanvasRef.current = null;
     };
-  }, []);
+  }, [closeNotebook, openNotebook, openPuzzle]);
+
+  const isInterfaceOpen = isNotebookOpen || isPuzzleOpen;
 
   return (
     <div ref={mountRef} className="fixed inset-0 cursor-crosshair">
+      {isInterfaceOpen ? (
+        <div className="pointer-events-none fixed inset-0 z-10 bg-black/55" />
+      ) : null}
       <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2">
         <div className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-white/70" />
         <div className="absolute left-0 top-1/2 h-px w-4 -translate-y-1/2 bg-white/70" />
@@ -291,7 +430,19 @@ export function ThreeScene() {
         <p className="text-white/55">
           {isSprinting ? "Sprint on" : "Sprint off"}
         </p>
+        <p className="text-white/55">J opens journal</p>
       </div>
+      <GameHud
+        isNotebookOpen={isNotebookOpen}
+        onCloseNotebook={closeNotebook}
+      />
+      <PuzzleModal
+        body="This is a reusable puzzle overlay opened from a Three.js raycast interaction."
+        isOpen={isPuzzleOpen}
+        onClose={closePuzzle}
+        onComplete={completeTestPuzzle}
+        title="Test Puzzle"
+      />
     </div>
   );
 }
