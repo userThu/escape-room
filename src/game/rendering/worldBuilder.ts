@@ -509,7 +509,7 @@ export function buildGameWorld(
         [-depth * 0.18, -height * 0.02],
         [depth * 0.18, -height * 0.02],
       ].forEach(([z, y]) => {
-        addGlassVessel(group, tubeGeometry, [innerX, y, z], [0.85, 0.88, 0.85], 0.045);
+        addGlassVessel(group, tubeGeometry, [innerX, y-.13, z], [0.85, 0.88, 0.85], 0.045);
       });
 
       addGlassVessel(group, beakerGeometry, [innerX, -height * 0.36, -depth * 0.22], [0.88, 0.88, 0.88], 0.18);
@@ -517,7 +517,7 @@ export function buildGameWorld(
       const waterGlass = addGlassVessel(
         group,
         beakerGeometry,
-        [innerX, -height * 0.02, depth * 0.32],
+        [innerX, -height * 0.02-.13, depth * 0.32],
         [1.05, 1.05, 1.05],
         0.18,
       );
