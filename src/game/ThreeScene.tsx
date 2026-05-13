@@ -31,6 +31,7 @@ import {
   selectInventoryItemByIndex,
   unlockDoor,
 } from "@/src/state";
+import { GameHud } from "@/src/ui/GameHud";
 import { MolecularPuzzleTerminal } from "@/src/ui/MolecularPuzzleTerminal";
 
 const playerHeight = 1.7;
@@ -181,6 +182,7 @@ export function ThreeScene() {
   const [startScreen, setStartScreen] = useState<StartScreen>("menu");
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [isSprinting, setIsSprinting] = useState(false);
+  const [isNotebookOpen, setIsNotebookOpen] = useState(false);
   const [isMolecularPuzzleOpen, setIsMolecularPuzzleOpen] = useState(false);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
@@ -257,6 +259,17 @@ export function ThreeScene() {
   }, []);
   // ────────────────────────────────────────────────────────────────────────
 
+  const openNotebook = useCallback(() => {
+    activeInterfaceRef.current = "notebook";
+    pausePlayerForInterface();
+    setIsNotebookOpen(true);
+  }, [pausePlayerForInterface]);
+ 
+  const closeNotebook = useCallback(() => {
+    setIsNotebookOpen(false);
+    resumePlayerFromInterface();
+  }, [resumePlayerFromInterface]);
+  
   const openMolecularPuzzle = useCallback(() => {
     activeInterfaceRef.current = "molecularPuzzle";
     pausePlayerForInterface();
@@ -854,6 +867,23 @@ export function ThreeScene() {
         return;
       }
 
+      if (event.code === "KeyJ" && !event.repeat) {
+        event.preventDefault();
+ 
+        if (activeInterfaceRef.current === "notebook") {
+          closeNotebook();
+        } else if (isPlayerPausedRef.current) {
+          return;
+        } else {
+          pressedKeys.clear();
+          sprinting = false;
+          setIsSprinting(false);
+          openNotebook();
+        }
+ 
+        return;
+      }
+
       if (/^Digit[1-9]$/.test(event.code) && !event.repeat) {
         if (isPlayerPausedRef.current) {
           return;
@@ -1068,7 +1098,7 @@ export function ThreeScene() {
                 {/* Title */}
                 <div className="mb-1 text-center">
                   <p className="mb-3 font-mono text-xs uppercase tracking-[0.3em] text-cyan-500/70">
-                    Laboratory Escape
+                    Escape Room
                   </p>
                   <h1
                     className="text-4xl font-bold tracking-tight text-slate-100"
@@ -1097,7 +1127,7 @@ export function ThreeScene() {
 
                 {/* Footer hint */}
                 <p className="mt-8 text-center font-mono text-xs text-slate-600">
-                  Click Play, then click the screen to lock your cursor
+                  A game-based assessment for chemistry skills.
                 </p>
               </>
             )}
@@ -1198,6 +1228,11 @@ export function ThreeScene() {
           </div>
         </>
       )}
+
+      <GameHud
+        isNotebookOpen={isNotebookOpen}
+        onCloseNotebook={closeNotebook}
+      />
 
       <MolecularPuzzleTerminal
         isOpen={isMolecularPuzzleOpen}
