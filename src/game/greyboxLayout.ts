@@ -46,8 +46,8 @@ export const greyboxBlocks: GreyboxBlock[] = [
   {
     id: "floor-exit-corridor",
     kind: "floor",
-    center: [0, -0.04, 6],
-    size: [4, 0.08, 4],
+    center: [0, -0.04, 7],
+    size: [6, 0.08, 6],
   },
   {
     id: "ceiling-hub",
@@ -70,8 +70,8 @@ export const greyboxBlocks: GreyboxBlock[] = [
   {
     id: "ceiling-exit-corridor",
     kind: "ceiling",
-    center: [0, ceilingY, 6],
-    size: [4, wallThickness, 4],
+    center: [0, ceilingY, 7],
+    size: [6, wallThickness, 6],
   },
   {
     id: "hub-north-wall-left",
@@ -154,31 +154,31 @@ export const greyboxBlocks: GreyboxBlock[] = [
   {
     id: "exit-corridor-west-wall",
     kind: "wall",
-    center: [-2, wallY, 6],
-    size: [wallThickness, wallHeight, 4],
+    center: [-3, wallY, 7],
+    size: [wallThickness, wallHeight, 6],
   },
   {
     id: "exit-corridor-east-wall",
     kind: "wall",
-    center: [2, wallY, 6],
-    size: [wallThickness, wallHeight, 4],
+    center: [3, wallY, 7],
+    size: [wallThickness, wallHeight, 6],
   },
   {
     id: "exit-wall-left",
     kind: "wall",
-    center: [-1.5, wallY, 8],
-    size: [1, wallHeight, wallThickness],
+    center: [-2, wallY, 10],
+    size: [2, wallHeight, wallThickness],
   },
   {
     id: "exit-wall-right",
     kind: "wall",
-    center: [1.5, wallY, 8],
-    size: [1, wallHeight, wallThickness],
+    center: [2, wallY, 10],
+    size: [2, wallHeight, wallThickness],
   },
   {
     id: "final-door",
     kind: "door",
-    center: [0, wallY, 8],
+    center: [0, wallY, 10],
     size: [2, wallHeight, wallThickness],
   },
 ];
@@ -190,18 +190,15 @@ export const greyboxColliderDefinitions = greyboxBlocks.filter(
 /**
  * Door definitions for the two-room, three-stage escape route.
  *
- * Stage gate → final-door : requires both lab puzzles + final_access item
+ * Stage gate → final-door : currently requires all Final Matter Reactor chambers.
  */
 export const doorDefinitions: DoorDefinition[] = [
   {
     id: "final-door",
     label: "Final Door",
-    requirement: {
-      inventoryItemIds: ["final_access"],
-      puzzleIds: ["molecular-structures", "evidence-lab"],
-    },
+    requirement: {},
     successMessage: "The final door releases with a heavy magnetic snap.",
     failureMessage:
-      "Sealed: complete both lab stages and present final access credentials.",
+      "Sealed: stabilize all three Matter Reactor chambers.",
   },
 ];

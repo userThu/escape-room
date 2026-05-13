@@ -27,6 +27,28 @@ export type LabNotebookEntry = {
   createdAt: number;
 };
 
+export type EvidenceLabState = {
+  evidenceVerified: boolean;
+  loadedReactants: {
+    bakingSoda: boolean;
+    vinegar: boolean;
+  };
+  pressureTestComplete: boolean;
+};
+
+export type FinalMatterChamberId = "bubble" | "sieve" | "spiral";
+
+export type FinalMatterChamberState = {
+  slots: [string | null, string | null];
+  stabilized: boolean;
+};
+
+export type FinalMatterReactorState = {
+  chambers: Record<FinalMatterChamberId, FinalMatterChamberState>;
+  finalAccessGranted: boolean;
+  particleDisplaysEnabled: boolean;
+};
+
 export type GameState = {
   completedPuzzles: Record<string, PuzzleCompletion>;
   inventoryItems: InventoryItem[];
@@ -35,6 +57,8 @@ export type GameState = {
   attempts: Record<string, number>;
   recordedResponses: RecordedResponse[];
   labNotebookEntries: LabNotebookEntry[];
+  evidenceLab: EvidenceLabState;
+  finalMatterReactor: FinalMatterReactorState;
 };
 
 const initialGameState: GameState = {
@@ -45,6 +69,32 @@ const initialGameState: GameState = {
   attempts: {},
   recordedResponses: [],
   labNotebookEntries: [],
+  evidenceLab: {
+    evidenceVerified: false,
+    loadedReactants: {
+      bakingSoda: false,
+      vinegar: false,
+    },
+    pressureTestComplete: false,
+  },
+  finalMatterReactor: {
+    chambers: {
+      bubble: {
+        slots: [null, null],
+        stabilized: false,
+      },
+      sieve: {
+        slots: [null, null],
+        stabilized: false,
+      },
+      spiral: {
+        slots: [null, null],
+        stabilized: false,
+      },
+    },
+    finalAccessGranted: false,
+    particleDisplaysEnabled: false,
+  },
 };
 
 let gameState = initialGameState;
@@ -136,6 +186,150 @@ export function unlockDoor(doorId: string) {
     doorLockStates: {
       ...state.doorLockStates,
       [doorId]: "unlocked",
+    },
+  }));
+}
+
+export function loadEvidenceReactant(reactant: keyof EvidenceLabState["loadedReactants"]) {
+  setGameState((state) => ({
+    ...state,
+    evidenceLab: {
+      ...state.evidenceLab,
+      loadedReactants: {
+        ...state.evidenceLab.loadedReactants,
+        [reactant]: true,
+      },
+    },
+  }));
+}
+
+export function markEvidencePressureTestComplete() {
+  setGameState((state) => ({
+    ...state,
+    evidenceLab: {
+      ...state.evidenceLab,
+      pressureTestComplete: true,
+    },
+  }));
+}
+
+export function markEvidenceVerified() {
+  setGameState((state) => ({
+    ...state,
+    evidenceLab: {
+      ...state.evidenceLab,
+      evidenceVerified: true,
+    },
+  }));
+}
+
+export function insertFinalMatterReactorItem(
+  chamberId: FinalMatterChamberId,
+  slotIndex: 0 | 1,
+  itemId: string,
+) {
+  setGameState((state) => {
+    const chamber = state.finalMatterReactor.chambers[chamberId];
+
+    if (chamber.slots[slotIndex]) {
+      return state;
+    }
+
+    const slots: [string | null, string | null] = [...chamber.slots] as [
+      string | null,
+      string | null,
+    ];
+    slots[slotIndex] = itemId;
+
+    return {
+      ...state,
+      finalMatterReactor: {
+        ...state.finalMatterReactor,
+        chambers: {
+          ...state.finalMatterReactor.chambers,
+          [chamberId]: {
+            ...chamber,
+            slots,
+          },
+        },
+      },
+    };
+  });
+}
+
+export function retrieveFinalMatterReactorItem(
+  chamberId: FinalMatterChamberId,
+  slotIndex: 0 | 1,
+): string | null {
+  let retrievedItemId: string | null = null;
+
+  setGameState((state) => {
+    const chamber = state.finalMatterReactor.chambers[chamberId];
+    retrievedItemId = chamber.slots[slotIndex];
+
+    if (!retrievedItemId) {
+      return state;
+    }
+
+    const slots: [string | null, string | null] = [...chamber.slots] as [
+      string | null,
+      string | null,
+    ];
+    slots[slotIndex] = null;
+
+    return {
+      ...state,
+      finalMatterReactor: {
+        ...state.finalMatterReactor,
+        chambers: {
+          ...state.finalMatterReactor.chambers,
+          [chamberId]: {
+            ...chamber,
+            slots,
+            stabilized: false,
+          },
+        },
+      },
+    };
+  });
+
+  return retrievedItemId;
+}
+
+export function stabilizeFinalMatterReactorChamber(
+  chamberId: FinalMatterChamberId,
+) {
+  setGameState((state) => ({
+    ...state,
+    finalMatterReactor: {
+      ...state.finalMatterReactor,
+      chambers: {
+        ...state.finalMatterReactor.chambers,
+        [chamberId]: {
+          ...state.finalMatterReactor.chambers[chamberId],
+          stabilized: true,
+        },
+      },
+    },
+  }));
+}
+
+export function grantFinalMatterAccess() {
+  setGameState((state) => ({
+    ...state,
+    finalMatterReactor: {
+      ...state.finalMatterReactor,
+      finalAccessGranted: true,
+    },
+  }));
+}
+
+export function enableFinalMatterParticleDisplays() {
+  setGameState((state) => ({
+    ...state,
+    finalMatterReactor: {
+      ...state.finalMatterReactor,
+      particleDisplaysEnabled: true,
     },
   }));
 }

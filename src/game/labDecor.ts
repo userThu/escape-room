@@ -77,7 +77,7 @@ export const labBoxProps: BoxProp[] = [
   },
   {
     id: "exit-corridor-lock-panel",
-    center: [1.72, 1.2, 7.3],
+    center: [2.72, 1.2, 9.1],
     size: [0.15, 0.8, 0.55],
     material: "hazard",
   },
@@ -123,12 +123,12 @@ export const labLamps: LabLamp[] = [
   },
   {
     id: "exit-corridor-fluorescent",
-    center: [0, 2.82, 6],
-    size: [1.4, 0.08, 0.28],
-    intensity: 1.8,
+    center: [0, 2.82, 7.4],
+    size: [2.2, 0.08, 0.28],
+    intensity: 2.2,
   },
 ];
 
 export const labPropColliderDefinitions: ColliderDefinition[] = labBoxProps
-  .filter(({ material }) => material !== "wallShelf")
+  .filter(({ id, material }) => material !== "wallShelf" && id !== "east-room-fume-hood")
   .map(({ center, id, size }) => ({ center, id, size }));

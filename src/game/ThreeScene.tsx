@@ -15,11 +15,20 @@ import {
   addInventoryItem,
   addLabNotebookEntry,
   completePuzzle,
+  enableFinalMatterParticleDisplays,
   getGameState,
   type InventoryItem,
+  grantFinalMatterAccess,
+  insertFinalMatterReactorItem,
+  loadEvidenceReactant,
+  markEvidencePressureTestComplete,
+  markEvidenceVerified,
   recordResponse,
   removeInventoryItem,
+  retrieveFinalMatterReactorItem,
   selectInventoryItemByIndex,
+  stabilizeFinalMatterReactorChamber,
+  type FinalMatterChamberId,
   unlockDoor,
 } from "@/src/state";
 import { GameHud } from "@/src/ui/GameHud";
@@ -31,21 +40,40 @@ const sprintSpeed = 7;
 const mouseSensitivity = 0.002;
 const maxPitch = Math.PI / 2 - 0.05;
 const interactionRange = 3;
-/**
- * Inventory item IDs that the evidence-lab reaction station accepts as inputs.
- * Cartridge/token IDs match the new two-room item catalogue.
- */
-const reactionIngredientIds = new Set([
-  "water_cartridge",
-  "vinegar_cartridge",
-  "baking_soda_cartridge",
-  "sugar_cartridge",
-  "sand_cartridge",
-  "bubble_token",
-  "spiral_token",
-  "sieve_token",
-  "particle_lens",
-]);
+const finalMatterChamberRequirements: Record<FinalMatterChamberId, string[]> = {
+  bubble: ["baking_soda_cartridge", "vinegar_cartridge"],
+  sieve: ["sand_cartridge", "water_cartridge"],
+  spiral: ["sugar_cartridge", "water_cartridge"],
+};
+
+const finalMatterInventoryItems: Partial<Record<string, InventoryItem>> = {
+  baking_soda_cartridge: {
+    id: "baking_soda_cartridge",
+    name: "Baking Soda Cartridge",
+    description: "A sealed baking soda sample cartridge for the Evidence Lab.",
+  },
+  sand_cartridge: {
+    id: "sand_cartridge",
+    name: "Sand Cartridge",
+    description: "A sealed sand sample cartridge for the Evidence Lab.",
+  },
+  sugar_cartridge: {
+    id: "sugar_cartridge",
+    name: "Sugar Cartridge",
+    description: "A sealed sugar sample cartridge for the Evidence Lab.",
+  },
+  vinegar_cartridge: {
+    id: "vinegar_cartridge",
+    name: "Vinegar Cartridge",
+    description: "A sealed vinegar sample cartridge for the Evidence Lab.",
+  },
+  water_cartridge: {
+    id: "water_cartridge",
+    name: "Water Cartridge",
+    description:
+      "A sealed cartridge of distilled water for the evidence-lab analysis station.",
+  },
+};
 
 type FeedbackMessage = {
   id: number;
@@ -68,9 +96,11 @@ export function ThreeScene() {
   const activeInterfaceRef = useRef<ActiveInterface>(null);
   const isPlayerPausedRef = useRef(true);
   const rendererCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const playStartedAtRef = useRef<number | null>(null);
   const targetedInteractableRef = useRef<Interactable | null>(null);
   const [startScreen, setStartScreen] = useState<StartScreen>("menu");
   const [isNotebookOpen, setIsNotebookOpen] = useState(false);
+  const [escapeSeconds, setEscapeSeconds] = useState<number | null>(null);
   const [interactionPrompt, setInteractionPrompt] = useState<string | null>(
     null,
   );
@@ -91,7 +121,7 @@ export function ThreeScene() {
         setFeedbackMessages((messages) =>
           messages.filter((message) => message.id !== id),
         );
-      }, 3200);
+      }, 6500);
     },
     [],
   );
@@ -123,6 +153,8 @@ export function ThreeScene() {
   }, [requestPointerLockAfterInterface]);
 
   const handlePlay = useCallback(() => {
+    playStartedAtRef.current = performance.now();
+    setEscapeSeconds(null);
     setStartScreen("gone");
     isPlayerPausedRef.current = false;
 
@@ -195,11 +227,12 @@ export function ThreeScene() {
       cabinetDoors,
       camera,
       doorMeshes,
+      evidenceLabMachine,
+      evidenceLabTargets,
+      finalMatterReactor,
       molecularPlaqueTargets,
       molecularSubmitLever,
       molecularSlotTargets,
-      reactionMachineChamber,
-      reactionMachineSliderSlot,
       renderer,
       scene,
       staticColliders,
@@ -217,6 +250,11 @@ export function ThreeScene() {
     const heldItemPivot = new THREE.Group();
     const heldBodyGeometry = new THREE.BoxGeometry(0.34, 0.24, 0.045);
     const heldFaceGeometry = new THREE.PlaneGeometry(0.3, 0.2);
+    const heldCartridgeGeometry = new THREE.CylinderGeometry(0.055, 0.055, 0.32, 16);
+    const heldCartridgeCapGeometry = new THREE.CylinderGeometry(0.062, 0.062, 0.045, 16);
+    const heldLensDiscGeometry = new THREE.CylinderGeometry(0.14, 0.14, 0.025, 24);
+    const heldLensRingGeometry = new THREE.TorusGeometry(0.105, 0.012, 8, 28);
+    const heldLensTraceGeometry = new THREE.BoxGeometry(0.15, 0.01, 0.012);
     const heldBodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x1f2937,
       roughness: 0.52,
@@ -228,6 +266,28 @@ export function ThreeScene() {
       roughness: 0.35,
       metalness: 0.12,
     });
+    const heldCartridgeShellMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe5e7eb,
+      roughness: 0.45,
+      metalness: 0.15,
+    });
+    const heldCartridgeCapMaterial = new THREE.MeshStandardMaterial({
+      color: 0x60a5fa,
+      roughness: 0.35,
+      metalness: 0.25,
+    });
+    const heldLensBodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x172033,
+      roughness: 0.34,
+      metalness: 0.55,
+    });
+    const heldLensCircuitMaterial = new THREE.MeshStandardMaterial({
+      color: 0x7dd3fc,
+      emissive: 0x075985,
+      emissiveIntensity: 0.8,
+      roughness: 0.22,
+      metalness: 0.2,
+    });
     const heldBody = new THREE.Mesh(heldBodyGeometry, heldBodyMaterial);
     const heldFace = new THREE.Mesh(
       heldFaceGeometry,
@@ -237,8 +297,33 @@ export function ThreeScene() {
         transparent: true,
       }),
     );
-    const heldGenericGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const heldGenericGeometry = new THREE.CylinderGeometry(0.11, 0.11, 0.08, 18);
     const heldGeneric = new THREE.Mesh(heldGenericGeometry, heldGenericMaterial);
+    const heldCartridge = new THREE.Group();
+    const heldLens = new THREE.Group();
+    const heldCartridgeBody = new THREE.Mesh(
+      heldCartridgeGeometry,
+      heldCartridgeShellMaterial,
+    );
+    const heldCartridgeTop = new THREE.Mesh(
+      heldCartridgeCapGeometry,
+      heldCartridgeCapMaterial,
+    );
+    const heldCartridgeBottom = new THREE.Mesh(
+      heldCartridgeCapGeometry,
+      heldCartridgeCapMaterial,
+    );
+    const heldLensDisc = new THREE.Mesh(heldLensDiscGeometry, heldLensBodyMaterial);
+    const heldLensRing = new THREE.Mesh(heldLensRingGeometry, heldLensCircuitMaterial);
+    const heldLensTraceA = new THREE.Mesh(heldLensTraceGeometry, heldLensCircuitMaterial);
+    const heldLensTraceB = new THREE.Mesh(heldLensTraceGeometry, heldLensCircuitMaterial);
+    const cartridgeAccentColors: Record<string, number> = {
+      baking_soda_cartridge: 0x60a5fa,
+      sand_cartridge: 0xa16207,
+      sugar_cartridge: 0xfacc15,
+      vinegar_cartridge: 0xef4444,
+      water_cartridge: 0x38bdf8,
+    };
     const plaqueKindsByItemId = new Map(
       molecularPlaques.map((plaque) => [plaque.id, plaque.kind]),
     );
@@ -248,7 +333,23 @@ export function ThreeScene() {
     heldItemGroup.visible = false;
     heldFace.position.z = 0.026;
     heldGeneric.visible = false;
-    heldItemPivot.add(heldBody, heldFace, heldGeneric);
+    heldGeneric.rotation.x = Math.PI / 2;
+    heldCartridgeBody.rotation.z = Math.PI / 2;
+    heldCartridgeTop.rotation.z = Math.PI / 2;
+    heldCartridgeBottom.rotation.z = Math.PI / 2;
+    heldCartridgeTop.position.x = 0.18;
+    heldCartridgeBottom.position.x = -0.18;
+    heldCartridge.add(heldCartridgeBody, heldCartridgeTop, heldCartridgeBottom);
+    heldCartridge.visible = false;
+    heldLensDisc.rotation.x = Math.PI / 2;
+    heldLensRing.rotation.x = Math.PI / 2;
+    heldLensRing.position.z = 0.018;
+    heldLensTraceA.position.z = 0.036;
+    heldLensTraceB.position.z = 0.038;
+    heldLensTraceB.rotation.z = Math.PI / 2;
+    heldLens.add(heldLensDisc, heldLensRing, heldLensTraceA, heldLensTraceB);
+    heldLens.visible = false;
+    heldItemPivot.add(heldBody, heldFace, heldGeneric, heldCartridge, heldLens);
     heldItemGroup.add(heldItemPivot);
     camera.add(heldItemGroup);
 
@@ -280,18 +381,34 @@ export function ThreeScene() {
         heldBody.visible = true;
         heldFace.visible = true;
         heldGeneric.visible = false;
+        heldCartridge.visible = false;
+        heldLens.visible = false;
         heldItemGroup.visible = true;
         return;
       }
 
       if (selectedItemId) {
+        const cartridgeColor = cartridgeAccentColors[selectedItemId];
+
         heldBody.visible = false;
         heldFace.visible = false;
-        heldGeneric.visible = true;
+        heldGeneric.visible = !cartridgeColor && selectedItemId !== "particle_lens";
+        heldCartridge.visible = Boolean(cartridgeColor);
+        heldLens.visible = selectedItemId === "particle_lens";
+
+        if (cartridgeColor) {
+          heldCartridgeCapMaterial.color.setHex(cartridgeColor);
+        }
+
         heldItemGroup.visible = true;
         return;
       }
 
+      heldBody.visible = false;
+      heldFace.visible = false;
+      heldGeneric.visible = false;
+      heldCartridge.visible = false;
+      heldLens.visible = false;
       heldItemGroup.visible = false;
     };
 
@@ -314,13 +431,21 @@ export function ThreeScene() {
             }
 
             const gameState = getGameState();
-            const hasItems = (door.requirement.inventoryItemIds ?? []).every(
-              (itemId) =>
-                gameState.inventoryItems.some(({ id }) => id === itemId),
+            const reactorChambers = Object.values(
+              gameState.finalMatterReactor.chambers,
             );
-            const hasPuzzles = (door.requirement.puzzleIds ?? []).every(
-              (puzzleId) => Boolean(gameState.completedPuzzles[puzzleId]),
-            );
+            const hasItems =
+              door.id === "final-door"
+                ? true
+                : (door.requirement.inventoryItemIds ?? []).every((itemId) =>
+                    gameState.inventoryItems.some(({ id }) => id === itemId),
+                  );
+            const hasPuzzles =
+              door.id === "final-door"
+                ? reactorChambers.every(({ stabilized }) => stabilized)
+                : (door.requirement.puzzleIds ?? []).every((puzzleId) =>
+                    Boolean(gameState.completedPuzzles[puzzleId]),
+                  );
 
             if (!hasItems || !hasPuzzles) {
               showFeedbackMessage(door.failureMessage, "failure");
@@ -340,13 +465,215 @@ export function ThreeScene() {
               staticColliders.splice(colliderIndex, 1);
             }
 
+            if (door.id === "final-door") {
+              const startedAt = playStartedAtRef.current ?? performance.now();
+
+              pressedKeys.clear();
+              sprinting = false;
+              isPlayerPausedRef.current = true;
+              releasePointerLock();
+              setInteractionPrompt(null);
+              setEscapeSeconds((performance.now() - startedAt) / 1000);
+            }
+
             showFeedbackMessage(door.successMessage, "success");
           },
         },
       ];
     });
+    const syncFinalMatterReactorVisuals = () => {
+      const { finalMatterReactor: reactorState } = getGameState();
+
+      (Object.keys(reactorState.chambers) as FinalMatterChamberId[]).forEach(
+        (chamberId) => {
+          finalMatterReactor.setChamberState(
+            chamberId,
+            reactorState.chambers[chamberId],
+          );
+        },
+      );
+      finalMatterReactor.setDoorLocked(!reactorState.finalAccessGranted);
+      finalMatterReactor.setParticleDisplaysEnabled(
+        reactorState.particleDisplaysEnabled,
+      );
+    };
+
+    syncFinalMatterReactorVisuals();
+
     const interactables: Interactable[] = [
       ...doorInteractables,
+      {
+        id: "final-matter-reactor-particle-display",
+        object: finalMatterReactor.displayTarget,
+        prompt: "The terminal seems to accept something..",
+        interact: () => {
+          const gameState = getGameState();
+
+          if (gameState.finalMatterReactor.particleDisplaysEnabled) {
+            showFeedbackMessage("Particle displays are already online.", "success");
+            return;
+          }
+
+          const selectedItem = gameState.inventoryItems.find(
+            ({ id }) => id === gameState.selectedInventoryItemId,
+          );
+
+          if (selectedItem?.id !== "particle_lens") {
+            showFeedbackMessage(
+              "The offline particle displays require the Particle Lens.",
+              "failure",
+            );
+            return;
+          }
+
+          removeInventoryItem(selectedItem.id);
+          enableFinalMatterParticleDisplays();
+          recordResponse(
+            "final-matter-reactor",
+            "Inserted the Particle Lens and restored final-door particle displays.",
+          );
+          showFeedbackMessage(
+            "Particle Lens inserted. Final-door particle displays are online.",
+            "success",
+          );
+          syncFinalMatterReactorVisuals();
+        },
+      },
+      ...finalMatterReactor.slotTargets.map<Interactable>((slot) => ({
+        id: slot.id,
+        object: slot.object,
+        prompt: `Press E to use ${slot.label}`,
+        interact: () => {
+          const gameState = getGameState();
+          const chamber = gameState.finalMatterReactor.chambers[slot.chamberId];
+          const chamberName = slot.label.split(" slot ")[0];
+          const placedItemId = chamber.slots[slot.slotIndex];
+
+          if (chamber.stabilized) {
+            showFeedbackMessage(`${slot.label.split(" slot ")[0]} is already stabilized.`, "success");
+            return;
+          }
+
+          if (placedItemId) {
+            const retrievedItemId = retrieveFinalMatterReactorItem(
+              slot.chamberId,
+              slot.slotIndex,
+            );
+
+            if (retrievedItemId && retrievedItemId !== "water_cartridge") {
+              addInventoryItem(
+                finalMatterInventoryItems[retrievedItemId] ?? {
+                  id: retrievedItemId,
+                  name: retrievedItemId.replaceAll("_", " "),
+                },
+              );
+            }
+
+            recordResponse(
+              "final-matter-reactor",
+              `Retrieved ${retrievedItemId ?? placedItemId} from the ${slot.chamberId} chamber.`,
+            );
+            showFeedbackMessage(`${chamberName} releases ${retrievedItemId ?? placedItemId}.`, "success");
+            syncFinalMatterReactorVisuals();
+            return;
+          }
+
+          const selectedItem = gameState.inventoryItems.find(
+            ({ id }) => id === gameState.selectedInventoryItemId,
+          );
+
+          if (!selectedItem) {
+            showFeedbackMessage(
+              "Select an inventory item before loading the Matter Reactor.",
+              "failure",
+            );
+            return;
+          }
+
+          if (!finalMatterInventoryItems[selectedItem.id]) {
+            showFeedbackMessage(
+              "Incorrect material for the Matter Reactor.",
+              "failure",
+            );
+            return;
+          }
+
+          insertFinalMatterReactorItem(
+            slot.chamberId,
+            slot.slotIndex,
+            selectedItem.id,
+          );
+
+          if (selectedItem.id !== "water_cartridge") {
+            removeInventoryItem(selectedItem.id);
+          }
+
+          recordResponse(
+            "final-matter-reactor",
+            `Loaded ${selectedItem.id} into the ${slot.chamberId} chamber.`,
+          );
+
+          const updatedState = getGameState();
+          const updatedChamber =
+            updatedState.finalMatterReactor.chambers[slot.chamberId];
+          const requiredToken = finalMatterChamberRequirements[slot.chamberId];
+          const loadedPair = [...updatedChamber.slots].sort().join("+");
+          const requiredPair = [...requiredToken].sort().join("+");
+
+          if (
+            updatedChamber.slots.every(Boolean) &&
+            loadedPair === requiredPair
+          ) {
+            stabilizeFinalMatterReactorChamber(slot.chamberId);
+            recordResponse(
+              "final-matter-reactor",
+              `Stabilized the ${slot.chamberId} chamber with ${requiredPair}.`,
+            );
+            showFeedbackMessage(`${chamberName} stabilizes.`, "success");
+          } else if (updatedChamber.slots.every(Boolean)) {
+            showFeedbackMessage(
+              "Incorrect pairing. Press E on a filled slot to retrieve its material.",
+              "failure",
+            );
+          } else {
+            showFeedbackMessage(`${selectedItem.name} locks into ${chamberName}.`, "success");
+          }
+
+          const latestState = getGameState();
+          const allChambersStable = (
+            Object.keys(
+              latestState.finalMatterReactor.chambers,
+            ) as FinalMatterChamberId[]
+          ).every(
+            (chamberId) =>
+              latestState.finalMatterReactor.chambers[chamberId].stabilized,
+          );
+
+          if (
+            allChambersStable &&
+            !latestState.finalMatterReactor.finalAccessGranted
+          ) {
+            grantFinalMatterAccess();
+            completePuzzle("final-matter-reactor");
+            addInventoryItem({
+              id: "final_access",
+              name: "Final Access",
+              description:
+                "A synchronized access signature from the Final Door Matter Reactor.",
+            });
+            recordResponse(
+              "final-matter-reactor",
+              "All chambers stabilized and final access was granted.",
+            );
+            showFeedbackMessage(
+              "All Matter Reactor chambers stabilize. Final Access granted.",
+              "success",
+            );
+          }
+
+          syncFinalMatterReactorVisuals();
+        },
+      })),
       ...molecularPlaqueTargets.map<Interactable>((plaque) => ({
         id: plaque.id,
         object: plaque.object,
@@ -370,10 +697,19 @@ export function ThreeScene() {
       ...molecularSlotTargets.map<Interactable>((slot) => ({
         id: slot.id,
         object: slot.object,
-        prompt: `Press E to place selected plaque in ${slot.formula}`,
+        prompt: `Press E to place or retrieve plaque in ${slot.formula}`,
         interact: () => {
-          if (placedMolecularSlots.has(slot.id)) {
-            showFeedbackMessage(`${slot.formula} already has a plaque.`, "success");
+          const placedPlaque = placedMolecularSlots.get(slot.id);
+
+          if (placedPlaque) {
+            slot.clearPlaque();
+            placedMolecularSlots.delete(slot.id);
+            addInventoryItem(placedPlaque.item);
+            recordResponse(
+              "molecular-structure-board",
+              `Retrieved ${placedPlaque.item.name} from the ${slot.formula} slot.`,
+            );
+            showFeedbackMessage(`${placedPlaque.item.name} returned to inventory.`, "success");
             return;
           }
 
@@ -443,76 +779,165 @@ export function ThreeScene() {
             "molecular-structure-board",
             "Submitted the correct molecule plaque arrangement.",
           );
-          showFeedbackMessage("Correct plaque arrangement accepted.", "success");
+          showFeedbackMessage(
+            "Molecular board solved. New lab note added: the Particle Lens reveals before/after particle diagrams at the final door.",
+            "success",
+          );
           completeMolecularPuzzle();
         },
       },
-      {
-        id: "evidence-lab-chamber",
-        object: reactionMachineChamber,
-        prompt: "Press E to load selected cartridge or token",
+      ...evidenceLabTargets.map((target) => ({
+        id: target.id,
+        object: target.object,
+        prompt: target.item
+          ? `Press E to collect ${target.label}`
+          : `Press E to inspect ${target.label}`,
         interact: () => {
-          const gameState = getGameState();
-          const selectedItem = gameState.inventoryItems.find(
-            ({ id }) => id === gameState.selectedInventoryItemId,
-          );
-
-          if (!selectedItem) {
-            showFeedbackMessage(
-              "Select a cartridge or token before loading the evidence-lab station.",
-              "failure",
+          if (target.item) {
+            const alreadyCollected = getGameState().inventoryItems.some(
+              ({ id }) => id === target.item?.id,
             );
+
+            if (alreadyCollected) {
+              showFeedbackMessage(`${target.label} is already in your inventory.`, "success");
+              return;
+            }
+
+            target.collect?.();
+            addInventoryItem(target.item);
+            recordResponse("evidence-lab", `Collected ${target.label}.`);
+            showFeedbackMessage(`${target.label} added to inventory.`, "success");
             return;
           }
 
-          if (!reactionIngredientIds.has(selectedItem.id)) {
-            showFeedbackMessage(
-              "The station rejects that item. Load a recognised cartridge or token.",
-              "failure",
+          if (target.id === "evidence-lab-sealed-reaction-tube") {
+            const gameState = getGameState();
+
+            if (gameState.evidenceLab.evidenceVerified) {
+              showFeedbackMessage("Evidence already verified.", "success");
+              return;
+            }
+
+            const selectedItem = gameState.inventoryItems.find(
+              ({ id }) => id === gameState.selectedInventoryItemId,
             );
+
+            if (
+              !selectedItem ||
+              !["vinegar_cartridge", "baking_soda_cartridge"].includes(
+                selectedItem.id,
+              )
+            ) {
+              showFeedbackMessage(
+                "Select vinegar or baking soda cartridge to load the tube.",
+                "failure",
+              );
+              return;
+            }
+
+            const reactantKey =
+              selectedItem.id === "vinegar_cartridge"
+                ? "vinegar"
+                : "bakingSoda";
+
+            if (gameState.evidenceLab.loadedReactants[reactantKey]) {
+              showFeedbackMessage(`${selectedItem.name} is already locked into the tube.`, "success");
+              return;
+            }
+
+            loadEvidenceReactant(reactantKey);
+            recordResponse(
+              "evidence-lab",
+              `Locked ${selectedItem.id} into the sealed reaction tube.`,
+            );
+            showFeedbackMessage(`${selectedItem.name} seats into the tube clamp.`, "success");
             return;
           }
 
-          removeInventoryItem(selectedItem.id);
-          recordResponse(
-            "evidence-lab",
-            `Loaded ${selectedItem.id} into the evidence-lab analysis station.`,
-          );
-          showFeedbackMessage(
-            `${selectedItem.name} loads into the evidence-lab station.`,
-            "success",
-          );
+          if (target.id === "evidence-lab-evidence-engine") {
+            const gameState = getGameState();
+
+            if (gameState.evidenceLab.evidenceVerified) {
+              showFeedbackMessage("Evidence already verified.", "success");
+              return;
+            }
+
+            if (!gameState.evidenceLab.pressureTestComplete) {
+              showFeedbackMessage("Tube not tested yet.", "failure");
+              return;
+            }
+
+            const selectedItem = gameState.inventoryItems.find(
+              ({ id }) => id === gameState.selectedInventoryItemId,
+            );
+
+            if (selectedItem?.id !== "bubble_evidence_token") {
+              showFeedbackMessage("No evidence token available.", "failure");
+              return;
+            }
+
+            removeInventoryItem(selectedItem.id);
+            addInventoryItem({
+              id: "bubble_token",
+              name: "Bubble Token",
+              description: "A verified token stamped with rising bubbles from the Evidence Lab reaction.",
+            });
+            markEvidenceVerified();
+            completePuzzle("evidence-lab");
+            addLabNotebookEntry(
+              "Evidence Lab — Gas Production",
+              "Gas production/bubbles indicate that a chemical reaction may have occurred because a new substance formed.",
+            );
+            recordResponse(
+              "evidence-lab",
+              "Verified bubble evidence token in the Evidence Engine.",
+            );
+            showFeedbackMessage("Evidence Engine verifies the gas evidence. Bubble Token awarded.", "success");
+            return;
+          }
+
+          if (target.id === "evidence-lab-pressure-gauge") {
+            const gameState = getGameState();
+
+            if (gameState.evidenceLab.evidenceVerified) {
+              showFeedbackMessage("Evidence already verified.", "success");
+              return;
+            }
+
+            if (!gameState.evidenceLab.loadedReactants.vinegar) {
+              showFeedbackMessage("Missing vinegar.", "failure");
+              return;
+            }
+
+            if (!gameState.evidenceLab.loadedReactants.bakingSoda) {
+              showFeedbackMessage("Missing baking soda.", "failure");
+              return;
+            }
+
+            if (gameState.evidenceLab.pressureTestComplete) {
+              showFeedbackMessage("Pressure test already complete. Take the evidence token to the Evidence Engine.", "success");
+              return;
+            }
+
+            evidenceLabMachine.activateReaction();
+            markEvidencePressureTestComplete();
+            addInventoryItem({
+              id: "bubble_evidence_token",
+              name: "Bubble Evidence Token",
+              description: "Unverified evidence from the pressure test: bubbling gas collected from the sealed tube.",
+            });
+            recordResponse(
+              "evidence-lab",
+              "Ran the pressure test after loading vinegar and baking soda; bubbles formed and pressure rose.",
+            );
+            showFeedbackMessage("Pressure test complete: bubbles detected, pressure high, evidence token released.", "success");
+            return;
+          }
+
+          showFeedbackMessage(`${target.label} is installed as a placeholder object.`, "success");
         },
-      },
-      {
-        id: "evidence-lab-lens-slot",
-        object: reactionMachineSliderSlot,
-        prompt: "Press E to insert Particle Lens",
-        interact: () => {
-          const gameState = getGameState();
-          const selectedItem = gameState.inventoryItems.find(
-            ({ id }) => id === gameState.selectedInventoryItemId,
-          );
-
-          if (selectedItem?.id !== "particle_lens") {
-            showFeedbackMessage(
-              "This station slot requires the Particle Lens.",
-              "failure",
-            );
-            return;
-          }
-
-          removeInventoryItem(selectedItem.id);
-          recordResponse(
-            "evidence-lab",
-            "Inserted the Particle Lens into the evidence-lab analysis station.",
-          );
-          showFeedbackMessage(
-            "The Particle Lens locks into the station with a precise click.",
-            "success",
-          );
-        },
-      },
+      })),
+      // evidence-lab-chamber and evidence-lab-lens-slot are temporarily disabled.
       ...cabinetDoors.map<Interactable>((door) => ({
         id: door.id,
         object: door.object,
@@ -522,7 +947,7 @@ export function ThreeScene() {
 
           recordResponse(
             "east-room-cabinet",
-            `${isOpen ? "Opened" : "Closed"} ${door.label}.`,
+            `${isOpen ? "opened" : "closed"} ${door.label}.`,
           );
           showFeedbackMessage(
             `${door.label} swings ${isOpen ? "open" : "closed"}.`,
@@ -693,13 +1118,14 @@ export function ThreeScene() {
       const now = performance.now();
       const deltaSeconds = Math.min((now - previousFrameAt) / 1000, 0.1);
       previousFrameAt = now;
+      evidenceLabMachine.update(now / 1000);
       updateHeldItemVisual();
 
       if (heldItemGroup.visible) {
         const elapsedSeconds = now / 1000;
 
         heldItemGroup.position.y = -0.32 + Math.sin(elapsedSeconds * 2.2) * 0.035;
-        heldItemPivot.rotation.y += deltaSeconds * 1.4;
+        heldItemPivot.rotation.y += deltaSeconds * 0.55;
         heldItemPivot.rotation.z = Math.sin(elapsedSeconds * 1.6) * 0.08;
       }
 
@@ -783,8 +1209,17 @@ export function ThreeScene() {
       heldBodyGeometry.dispose();
       heldFaceGeometry.dispose();
       heldGenericGeometry.dispose();
+      heldCartridgeGeometry.dispose();
+      heldCartridgeCapGeometry.dispose();
+      heldLensDiscGeometry.dispose();
+      heldLensRingGeometry.dispose();
+      heldLensTraceGeometry.dispose();
       heldBodyMaterial.dispose();
       heldGenericMaterial.dispose();
+      heldCartridgeShellMaterial.dispose();
+      heldCartridgeCapMaterial.dispose();
+      heldLensBodyMaterial.dispose();
+      heldLensCircuitMaterial.dispose();
       if (heldFace.material instanceof THREE.MeshBasicMaterial) {
         heldFace.material.map?.dispose();
         heldFace.material.dispose();
@@ -792,7 +1227,13 @@ export function ThreeScene() {
       world.dispose();
       rendererCanvasRef.current = null;
     };
-  }, [closeNotebook, completeMolecularPuzzle, openNotebook, showFeedbackMessage]);
+  }, [
+    closeNotebook,
+    completeMolecularPuzzle,
+    openNotebook,
+    releasePointerLock,
+    showFeedbackMessage,
+  ]);
 
   const isInterfaceOpen = isNotebookOpen;
 
@@ -807,9 +1248,10 @@ export function ThreeScene() {
         />
       ) : (
         <GameOverlay
+          escapeSeconds={escapeSeconds}
           feedbackMessages={feedbackMessages}
           interactionPrompt={interactionPrompt}
-          isInterfaceOpen={isInterfaceOpen}
+          isInterfaceOpen={isInterfaceOpen || escapeSeconds !== null}
         />
       )}
 
@@ -940,20 +1382,40 @@ function StartOverlay({
 }
 
 type GameOverlayProps = {
+  escapeSeconds: number | null;
   feedbackMessages: FeedbackMessage[];
   interactionPrompt: string | null;
   isInterfaceOpen: boolean;
 };
 
 function GameOverlay({
+  escapeSeconds,
   feedbackMessages,
   interactionPrompt,
   isInterfaceOpen,
 }: GameOverlayProps) {
+  const escapedMinutes = escapeSeconds === null ? 0 : Math.floor(escapeSeconds / 60);
+  const escapedSeconds =
+    escapeSeconds === null ? 0 : Math.floor(escapeSeconds % 60);
+
   return (
     <>
       {isInterfaceOpen ? (
         <div className="pointer-events-none fixed inset-0 z-10 bg-black/55" />
+      ) : null}
+      {escapeSeconds !== null ? (
+        <section className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-cyan-300/40 bg-slate-950/95 p-8 text-center text-white shadow-2xl shadow-cyan-950/50">
+          <p className="font-mono text-xs uppercase tracking-[0.35em] text-cyan-300/70">
+            Final Door Opened
+          </p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">You Escaped!</h2>
+          <p className="mt-5 text-sm uppercase tracking-[0.25em] text-slate-400">
+            Time
+          </p>
+          <p className="mt-2 font-mono text-3xl text-cyan-200">
+            {escapedMinutes}:{escapedSeconds.toString().padStart(2, "0")}
+          </p>
+        </section>
       ) : null}
       <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2">
         <div className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-white/70" />
