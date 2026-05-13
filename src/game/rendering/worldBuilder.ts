@@ -39,6 +39,7 @@ export type BuiltGameWorld = {
   scene: THREE.Scene;
   staticColliders: AabbCollider[];
   molecularPlaqueTargets: MolecularPlaqueTarget[];
+  molecularSubmitLever: MolecularSubmitLeverTarget;
   molecularSlotTargets: MolecularSlotTarget[];
   waterBeaker: THREE.Object3D;
   dispose: () => void;
@@ -54,6 +55,7 @@ export type CabinetDoorTarget = {
 export type MolecularPlaqueTarget = {
   id: string;
   formula: MoleculeFormula | "distractor";
+  kind: string;
   object: THREE.Object3D;
   item: {
     id: string;
@@ -67,7 +69,13 @@ export type MolecularSlotTarget = {
   id: string;
   formula: MoleculeFormula;
   object: THREE.Object3D;
-  placePlaque: () => void;
+  clearPlaque: () => void;
+  placePlaque: (kind: string) => void;
+};
+
+export type MolecularSubmitLeverTarget = {
+  object: THREE.Object3D;
+  pull: () => void;
 };
 
 export function buildGameWorld(
@@ -178,6 +186,12 @@ export function buildGameWorld(
     roughness: 0.18,
     metalness: 0.04,
   });
+  const circuitTraceMaterial = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+  });
+  const circuitGlowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x86efac,
+  });
   const glassMaterial = new THREE.MeshStandardMaterial({
     color: 0x8ecae6,
     opacity: 0.52,
@@ -280,6 +294,7 @@ export function buildGameWorld(
   const cabinetDoors: CabinetDoorTarget[] = [];
   const molecularPlaqueTargets: MolecularPlaqueTarget[] = [];
   const molecularSlotTargets: MolecularSlotTarget[] = [];
+  let molecularSubmitLever: MolecularSubmitLeverTarget | null = null;
   let reactionMachineChamber: THREE.Object3D | null = null;
   let reactionMachineSliderSlot: THREE.Object3D | null = null;
   let waterBeaker: THREE.Object3D | null = null;
@@ -678,8 +693,14 @@ export function buildGameWorld(
 
   const boardGroup = new THREE.Group();
 
-  addBoxComponent(boardGroup, terminalTrimMaterial, [0, 0, -0.035], [2.6, 1.82, 0.07]);
-  addBoxComponent(boardGroup, paperMaterial, [0, 0, 0.01], [2.42, 1.64, 0.035]);
+  addBoxComponent(boardGroup, terminalTrimMaterial, [0, 0, -0.045], [3.05, 1.98, 0.09]);
+  addBoxComponent(boardGroup, terminalBodyMaterial, [0, 0, 0.005], [2.84, 1.78, 0.04]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [0, 0.88, 0.04], [2.56, 0.025, 0.025]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [0, -0.88, 0.04], [2.56, 0.025, 0.025]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [-1.28, 0, 0.04], [0.025, 1.64, 0.025]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [1.28, 0, 0.04], [0.025, 1.64, 0.025]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [0, 0, 0.045], [0.04, 1.45, 0.02]);
+  addBoxComponent(boardGroup, circuitTraceMaterial, [0, -0.02, 0.045], [2.18, 0.04, 0.02]);
 
   molecularBoardSlots.forEach(({ formula, id }, index) => {
     const column = index % 2;
@@ -707,18 +728,80 @@ export function buildGameWorld(
 
     label.position.set(x, y - 0.25, 0.085);
     boardGroup.add(label);
+    addBoxComponent(boardGroup, circuitGlowMaterial, [x - 0.5, y + 0.12, 0.075], [0.08, 0.08, 0.018]);
+    addBoxComponent(boardGroup, circuitTraceMaterial, [x, y + 0.48, 0.065], [0.54, 0.025, 0.018]);
 
     generatedGeometries.push(placedGeometry, labelGeometry);
     molecularSlotTargets.push({
       id,
       formula,
       object: slot,
-      placePlaque: () => {
+      clearPlaque: () => {
+        placedPlaque.visible = false;
+      },
+      placePlaque: (kind) => {
+        const texture = createMoleculePlaqueTexture(kind);
+
+        if (placedPlaque.material instanceof THREE.Material) {
+          const oldMaterialIndex = generatedMaterials.indexOf(
+            placedPlaque.material,
+          );
+
+          if (oldMaterialIndex >= 0) {
+            generatedMaterials.splice(oldMaterialIndex, 1);
+          }
+
+          if (
+            placedPlaque.material instanceof THREE.MeshBasicMaterial &&
+            placedPlaque.material.map
+          ) {
+            const oldTextureIndex = generatedTextures.indexOf(
+              placedPlaque.material.map,
+            );
+
+            if (oldTextureIndex >= 0) {
+              generatedTextures.splice(oldTextureIndex, 1);
+            }
+
+            placedPlaque.material.map.dispose();
+          }
+
+          placedPlaque.material.dispose();
+        }
+
+        placedPlaque.material = createTextureMaterial(texture);
         placedPlaque.visible = true;
-        slot.raycast = () => {};
       },
     });
   });
+
+  const leverPivot = new THREE.Group();
+  const leverBase = addBoxComponent(boardGroup, terminalTrimMaterial, [1.72, 0, 0.06], [0.28, 0.7, 0.08]);
+  addCylinderComponent(
+    leverPivot,
+    cylinderGeometry,
+    hazardMaterial,
+    [0, 0.22, 0],
+    [0.045, 0.32, 0.045],
+    [0, 0, Math.PI / 2],
+  );
+
+  addCylinderComponent(
+    leverPivot,
+    cylinderGeometry,
+    circuitGlowMaterial,
+    [0, 0.52, 0],
+    [0.09, 0.05, 0.09],
+  );
+  leverPivot.position.set(1.72, -0.24, 0.14);
+  leverPivot.rotation.z = -0.45;
+  boardGroup.add(leverPivot);
+  molecularSubmitLever = {
+    object: leverBase,
+    pull: () => {
+      leverPivot.rotation.z = leverPivot.rotation.z < 0 ? 0.45 : -0.45;
+    },
+  };
 
   boardGroup.position.set(0, 1.62, -11.84);
   scene.add(boardGroup);
@@ -735,6 +818,7 @@ export function buildGameWorld(
     molecularPlaqueTargets.push({
       id: plaque.id,
       formula: plaque.formula,
+      kind: plaque.kind,
       object: body,
       item: {
         id: plaque.id,
@@ -811,7 +895,12 @@ export function buildGameWorld(
     ...labPropColliderDefinitions,
   ].map(createAabbCollider);
 
-  if (!reactionMachineChamber || !reactionMachineSliderSlot || !waterBeaker) {
+  if (
+    !reactionMachineChamber ||
+    !reactionMachineSliderSlot ||
+    !waterBeaker ||
+    !molecularSubmitLever
+  ) {
     throw new Error("Reaction machine interaction targets were not created.");
   }
 
@@ -825,6 +914,7 @@ export function buildGameWorld(
     scene,
     staticColliders,
     molecularPlaqueTargets,
+    molecularSubmitLever,
     molecularSlotTargets,
     waterBeaker,
     dispose: () => {
@@ -853,6 +943,8 @@ export function buildGameWorld(
       terminalBodyMaterial.dispose();
       terminalTrimMaterial.dispose();
       terminalScreenMaterial.dispose();
+      circuitTraceMaterial.dispose();
+      circuitGlowMaterial.dispose();
       amberChemicalMaterial.dispose();
       violetChemicalMaterial.dispose();
       waterMaterial.dispose();

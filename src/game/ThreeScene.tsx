@@ -8,11 +8,14 @@ import {
   getTargetedInteractable,
   type Interactable,
 } from "@/src/game/interactions";
+import { molecularPlaques } from "@/src/game/molecularStructuresRoom";
 import { buildGameWorld } from "@/src/game/rendering/worldBuilder";
+import { createMoleculePlaqueTexture } from "@/src/game/rendering/textures";
 import {
   addInventoryItem,
   completePuzzle,
   getGameState,
+  type InventoryItem,
   recordResponse,
   removeInventoryItem,
   selectInventoryItemByIndex,
@@ -42,6 +45,13 @@ type FeedbackMessage = {
   id: number;
   text: string;
   tone: "success" | "failure";
+};
+
+type PlacedMolecularPlaque = {
+  formula: string;
+  item: InventoryItem;
+  kind: string;
+  slotId: string;
 };
 
 type ActiveInterface = "notebook" | null;
@@ -168,6 +178,7 @@ export function ThreeScene() {
       camera,
       doorMeshes,
       molecularPlaqueTargets,
+      molecularSubmitLever,
       molecularSlotTargets,
       reactionMachineChamber,
       reactionMachineSliderSlot,
@@ -178,11 +189,93 @@ export function ThreeScene() {
     } = world;
 
     rendererCanvasRef.current = renderer.domElement;
+    scene.add(camera);
 
     const openedDoorIds = new Set<string>();
-    const placedMolecularSlots = new Set<string>();
+    const placedMolecularSlots = new Map<string, PlacedMolecularPlaque>();
     const raycaster = new THREE.Raycaster();
     raycaster.far = interactionRange;
+    const heldItemGroup = new THREE.Group();
+    const heldItemPivot = new THREE.Group();
+    const heldBodyGeometry = new THREE.BoxGeometry(0.34, 0.24, 0.045);
+    const heldFaceGeometry = new THREE.PlaneGeometry(0.3, 0.2);
+    const heldBodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      roughness: 0.52,
+      metalness: 0.25,
+    });
+    const heldGenericMaterial = new THREE.MeshStandardMaterial({
+      color: 0x60a5fa,
+      emissive: 0x0f172a,
+      roughness: 0.35,
+      metalness: 0.12,
+    });
+    const heldBody = new THREE.Mesh(heldBodyGeometry, heldBodyMaterial);
+    const heldFace = new THREE.Mesh(
+      heldFaceGeometry,
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+      }),
+    );
+    const heldGenericGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const heldGeneric = new THREE.Mesh(heldGenericGeometry, heldGenericMaterial);
+    const plaqueKindsByItemId = new Map(
+      molecularPlaques.map((plaque) => [plaque.id, plaque.kind]),
+    );
+    let selectedHeldItemId: string | null = null;
+
+    heldItemGroup.position.set(0.42, -0.32, -0.9);
+    heldItemGroup.visible = false;
+    heldFace.position.z = 0.026;
+    heldGeneric.visible = false;
+    heldItemPivot.add(heldBody, heldFace, heldGeneric);
+    heldItemGroup.add(heldItemPivot);
+    camera.add(heldItemGroup);
+
+    const updateHeldItemVisual = () => {
+      const gameState = getGameState();
+      const selectedItemId = gameState.selectedInventoryItemId;
+
+      if (selectedItemId === selectedHeldItemId) {
+        return;
+      }
+
+      selectedHeldItemId = selectedItemId;
+
+      if (heldFace.material instanceof THREE.MeshBasicMaterial) {
+        heldFace.material.map?.dispose();
+        heldFace.material.dispose();
+      }
+
+      const plaqueKind = selectedItemId
+        ? plaqueKindsByItemId.get(selectedItemId)
+        : null;
+
+      if (plaqueKind) {
+        heldFace.material = new THREE.MeshBasicMaterial({
+          map: createMoleculePlaqueTexture(plaqueKind),
+          side: THREE.DoubleSide,
+          transparent: true,
+        });
+        heldBody.visible = true;
+        heldFace.visible = true;
+        heldGeneric.visible = false;
+        heldItemGroup.visible = true;
+        return;
+      }
+
+      if (selectedItemId) {
+        heldBody.visible = false;
+        heldFace.visible = false;
+        heldGeneric.visible = true;
+        heldItemGroup.visible = true;
+        return;
+      }
+
+      heldItemGroup.visible = false;
+    };
 
     const doorInteractables = doorDefinitions.flatMap<Interactable>((door) => {
       const doorMesh = doorMeshes.get(door.id);
@@ -279,29 +372,63 @@ export function ThreeScene() {
             return;
           }
 
-          if (selectedPlaque.formula !== slot.formula) {
-            recordResponse(
-              "molecular-structure-board",
-              `Tried ${selectedItem.name} in the ${slot.formula} slot.`,
-            );
-            showFeedbackMessage("That plaque does not match this formula.", "failure");
-            return;
-          }
-
-          slot.placePlaque();
-          placedMolecularSlots.add(slot.id);
+          slot.placePlaque(selectedPlaque.kind);
+          placedMolecularSlots.set(slot.id, {
+            formula: selectedPlaque.formula,
+            item: selectedItem,
+            kind: selectedPlaque.kind,
+            slotId: slot.id,
+          });
           removeInventoryItem(selectedItem.id);
           recordResponse(
             "molecular-structure-board",
-            `Placed ${selectedItem.name} in the ${slot.formula} slot.`,
+            `Placed ${selectedItem.name} in the ${slot.formula} slot for verification.`,
           );
-          showFeedbackMessage(`${slot.formula} plaque locks into place.`, "success");
-
-          if (placedMolecularSlots.size === molecularSlotTargets.length) {
-            completeMolecularPuzzle();
-          }
+          showFeedbackMessage(`${selectedItem.name} rests in the ${slot.formula} slot.`, "success");
         },
       })),
+      {
+        id: "molecular-board-submit-lever",
+        object: molecularSubmitLever.object,
+        prompt: "Press E to pull verification lever",
+        interact: () => {
+          molecularSubmitLever.pull();
+
+          if (placedMolecularSlots.size < molecularSlotTargets.length) {
+            showFeedbackMessage("The board refuses to run: every slot must be filled.", "failure");
+            return;
+          }
+
+          const isCorrect = molecularSlotTargets.every((slot) => {
+            const placed = placedMolecularSlots.get(slot.id);
+
+            return placed?.formula === slot.formula;
+          });
+
+          if (!isCorrect) {
+            placedMolecularSlots.forEach(({ item }, slotId) => {
+              addInventoryItem(item);
+              molecularSlotTargets
+                .find((slot) => slot.id === slotId)
+                ?.clearPlaque();
+            });
+            placedMolecularSlots.clear();
+            recordResponse(
+              "molecular-structure-board",
+              "Submitted an incorrect molecule plaque arrangement.",
+            );
+            showFeedbackMessage("The board buzzes and ejects the plaques back to inventory.", "failure");
+            return;
+          }
+
+          recordResponse(
+            "molecular-structure-board",
+            "Submitted the correct molecule plaque arrangement.",
+          );
+          showFeedbackMessage("Correct plaque arrangement accepted.", "success");
+          completeMolecularPuzzle();
+        },
+      },
       {
         id: "reaction-machine-chamber",
         object: reactionMachineChamber,
@@ -548,6 +675,15 @@ export function ThreeScene() {
       const now = performance.now();
       const deltaSeconds = Math.min((now - previousFrameAt) / 1000, 0.1);
       previousFrameAt = now;
+      updateHeldItemVisual();
+
+      if (heldItemGroup.visible) {
+        const elapsedSeconds = now / 1000;
+
+        heldItemGroup.position.y = -0.32 + Math.sin(elapsedSeconds * 2.2) * 0.035;
+        heldItemPivot.rotation.y += deltaSeconds * 1.4;
+        heldItemPivot.rotation.z = Math.sin(elapsedSeconds * 1.6) * 0.08;
+      }
 
       if (!isPlayerPausedRef.current) {
         moveDirection.set(0, 0, 0);
@@ -625,6 +761,16 @@ export function ThreeScene() {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("resize", handleResize);
+      camera.remove(heldItemGroup);
+      heldBodyGeometry.dispose();
+      heldFaceGeometry.dispose();
+      heldGenericGeometry.dispose();
+      heldBodyMaterial.dispose();
+      heldGenericMaterial.dispose();
+      if (heldFace.material instanceof THREE.MeshBasicMaterial) {
+        heldFace.material.map?.dispose();
+        heldFace.material.dispose();
+      }
       world.dispose();
       rendererCanvasRef.current = null;
     };
