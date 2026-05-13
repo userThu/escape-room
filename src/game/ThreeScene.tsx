@@ -562,7 +562,7 @@ export function ThreeScene() {
       const depth = size[2];
 
       if (material === "bench") {
-        addBoxComponent(group, benchMaterial, [0, height / 2 - 0.07, 0], [width, 0.16, depth]);
+        addBoxComponent(group, benchMaterial, [0, height / 2 - 0.069, 0], [width, 0.16, depth]);
         addBoxComponent(group, metalMaterial, [-width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
         addBoxComponent(group, metalMaterial, [width * 0.4, 0, -depth * 0.38], [0.12, height, 0.12]);
         addBoxComponent(group, metalMaterial, [-width * 0.4, 0, depth * 0.38], [0.12, height, 0.12]);
@@ -570,18 +570,18 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [0, -height * 0.18, 0], [width * 0.82, 0.08, depth * 0.82]);
         addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.22, height / 2 + 0.16, 0], [1, 1, 1]);
         addBoxComponent(group, amberChemicalMaterial, [-width * 0.22, height / 2 + 0.04, 0], [0.18, 0.1, 0.18]);
-        addBoxComponent(group, paperMaterial, [width * 0.22, height / 2 + 0.02, depth * 0.08], [0.5, 0.02, 0.34]);
+        addBoxComponent(group, paperMaterial, [width * 0.22-.18, height / 2 + 0.02, depth * 0.08+.05], [0.5, 0.02, 0.34]);
         addVialRack(group, [width * 0.08, height / 2 + 0.04, -depth * 0.22]);
       } else if (material === "machine") {
-        addBoxComponent(group, terminalBodyMaterial, [0, 0, 0], [width, height, depth]);
-        addBoxComponent(group, terminalTrimMaterial, [0, height * 0.32, -depth / 2 - 0.03], [width * 0.78, height * 0.34, 0.05]);
-        addBoxComponent(group, terminalScreenMaterial, [-width * 0.2, height * 0.34, -depth / 2 - 0.06], [width * 0.22, height * 0.18, 0.035]);
-        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.34, -depth / 2 - 0.06], [width * 0.28, height * 0.05, 0.035]);
-        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.23, -depth / 2 - 0.06], [width * 0.28, height * 0.05, 0.035]);
-        addBoxComponent(group, metalMaterial, [0, -height * 0.18, -depth / 2 - 0.04], [width * 0.86, height * 0.04, 0.04]);
-        addBoxComponent(group, metalMaterial, [0, -height * 0.02, -depth / 2 - 0.04], [width * 0.86, height * 0.04, 0.04]);
-        addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.34, -height * 0.18, -depth * 0.18], [0.75, 0.82, 0.75]);
-        addBoxComponent(group, violetChemicalMaterial, [-width * 0.34, -height * 0.26, -depth * 0.18], [0.12, 0.08, 0.12]);
+        addBoxComponent(group, terminalBodyMaterial, [0, 0-.405, 0], [width, height-.4, depth]);
+        addBoxComponent(group, terminalTrimMaterial, [0, height * 0.32-.405, -depth / 2 - 0.03], [width * 0.78, height * 0.34-.4, 0.05]);
+        addBoxComponent(group, terminalScreenMaterial, [-width * 0.2, height * 0.34-.405, -depth / 2 - 0.06], [width * 0.22, height * 0.18-.4, 0.035]);
+        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.34-.405, -depth / 2 - 0.06], [width * 0.28, height * 0.05-.4, 0.035]);
+        addBoxComponent(group, blackRubberMaterial, [width * 0.18, height * 0.23-.405, -depth / 2 - 0.06], [width * 0.28, height * 0.05-.4, 0.035]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.18-.405, -depth / 2 - 0.04], [width * 0.86, height * 0.04-.4, 0.04]);
+        addBoxComponent(group, metalMaterial, [0, -height * 0.02-.405, -depth / 2 - 0.04], [width * 0.86, height * 0.04-.4, 0.04]);
+        addCylinderComponent(group, beakerGeometry, glassMaterial, [-width * 0.34, -height * 0.18-.405, -depth * 0.18], [0.75, 0.82-.4, 0.75]);
+        addBoxComponent(group, violetChemicalMaterial, [-width * 0.34, -height * 0.26-.405, -depth * 0.18], [0.12, 0.08-.4, 0.12]);
       } else if (material === "metal") {
         addBoxComponent(group, metalMaterial, [0, 0, 0], [width, height * 0.08, depth]);
         addBoxComponent(group, metalMaterial, [0, height * 0.28, 0], [width, height * 0.08, depth]);
@@ -592,9 +592,9 @@ export function ThreeScene() {
         addBoxComponent(group, metalMaterial, [width * 0.45, 0, depth * 0.4], [0.08, height, 0.08]);
         addVialRack(group, [0, height * 0.24+.2, 0]);
       } else {
-        addBoxComponent(group, hazardMaterial, [0, 0, 0], [width, height, depth]);
-        addBoxComponent(group, blackRubberMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
-        addBoxComponent(group, blackRubberMaterial, [0, -height * 0.04, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
+        addBoxComponent(group, blackRubberMaterial, [0, 0, 0], [width, height, depth]);
+        addBoxComponent(group, hazardMaterial, [0, height * 0.22, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
+        addBoxComponent(group, hazardMaterial, [0, -height * 0.04, -depth / 2 - 0.02], [width * 0.72, height * 0.08, 0.04]);
       }
 
       return group;
